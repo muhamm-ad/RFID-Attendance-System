@@ -1,0 +1,21 @@
+# Node.js (Backend)
+pc/backend/node_modules/
+pc/backend/package-lock.json
+pc/backend/.env
+pc/backend/*.db
+pc/data/
+pc/backend/data/
+pc/backend/*.sqlite
+pc/backend/*.sqlite3
+
+# Python (__pycache__)
+esp32/__pycache__/
+
+# Editor/IDE Files
+.vscode/
+.idea/
+*.log
+
+# System Files (macOS, Linux, Windows)
+.DS_Store
+Thumbs.db
