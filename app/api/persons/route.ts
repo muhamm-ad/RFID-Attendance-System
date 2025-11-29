@@ -1,6 +1,6 @@
 // app/api/persons/route.ts
 import { NextRequest, NextResponse } from "next/server";
-import db from "@/lib/db";
+import sql from "@/lib/db";
 import { Person, PersonWithPayments } from "@/lib/types";
 import { getPersonWithPayments } from "@/lib/utils";
 
@@ -10,25 +10,31 @@ export async function GET(request: NextRequest) {
     const { searchParams } = new URL(request.url);
     const type = searchParams.get("type"); // Filter by type if provided
 
-    let query = "SELECT * FROM Persons";
-    const params: any[] = [];
-
+    let result;
     if (type && ["student", "teacher", "staff", "visitor"].includes(type)) {
-      query += " WHERE type = ?";
-      params.push(type);
+      result = await sql`
+        SELECT * FROM Persons 
+        WHERE type = ${type}
+        ORDER BY nom, prenom
+      `;
+    } else {
+      result = await sql`
+        SELECT * FROM Persons 
+        ORDER BY nom, prenom
+      `;
     }
 
-    query += " ORDER BY nom, prenom";
-
-    const persons = db.prepare(query).all(...params) as Person[];
+    const persons = result.rows as Person[];
 
     // For students, add payment info
-    const personsWithPayments = persons.map((person) => {
-      if (person.type === "student") {
-        return getPersonWithPayments(person.rfid_uuid);
-      }
-      return person;
-    });
+    const personsWithPayments = await Promise.all(
+      persons.map(async (person) => {
+        if (person.type === "student") {
+          return await getPersonWithPayments(person.rfid_uuid);
+        }
+        return person;
+      })
+    );
 
     console.log(`📋 ${personsWithPayments.length} persons retrieved`);
     return NextResponse.json(personsWithPayments);
@@ -76,26 +82,20 @@ export async function POST(request: NextRequest) {
     }
 
     // Insert the new person with rfid_uuid
-    const result = db
-      .prepare(
-        `
+    const result = await sql`
       INSERT INTO Persons (rfid_uuid, type, nom, prenom, photo_path)
-      VALUES (?, ?, ?, ?, ?)
-    `
-      )
-      .run(rfid_uuid, type, nom, prenom, photo_path);
+      VALUES (${rfid_uuid}, ${type}, ${nom}, ${prenom}, ${photo_path})
+      RETURNING *
+    `;
 
-    // Retrieve the created person
-    const newPerson = db
-      .prepare("SELECT * FROM Persons WHERE id = ?")
-      .get(result.lastInsertRowid) as Person;
+    const newPerson = result.rows[0] as Person;
 
     console.log(`✅ New person created: ${prenom} ${nom} (${type})`);
     return NextResponse.json(newPerson, { status: 201 });
   } catch (error: any) {
     console.error("❌ Error while creating the person:", error);
 
-    if (error.message && error.message.includes("UNIQUE constraint failed")) {
+    if (error.message && (error.message.includes("UNIQUE constraint") || error.message.includes("duplicate key"))) {
       if (error.message.includes("rfid_uuid")) {
         return NextResponse.json(
           { error: "This RFID UUID is already associated with a person" },

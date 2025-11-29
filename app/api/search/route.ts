@@ -1,6 +1,6 @@
 // app/api/search/route.ts
 import { NextRequest, NextResponse } from "next/server";
-import db from "@/lib/db";
+import sql from "@/lib/db";
 import { Person, PersonWithPayments } from "@/lib/types";
 import { getPersonWithPayments } from "@/lib/utils";
 
@@ -21,40 +21,47 @@ export async function GET(request: NextRequest) {
     const isNumeric = !isNaN(Number(query));
     const queryId = isNumeric ? Number(query) : null;
 
+    const searchPattern = `%${query}%`;
+
     let sqlQuery = `
       SELECT 
         p.*
       FROM Persons p
       WHERE (
-        p.nom LIKE ? OR 
-        p.prenom LIKE ? OR 
-        p.rfid_uuid LIKE ?
-        ${queryId !== null ? "OR p.id = ?" : ""}
+        p.nom LIKE $1 OR 
+        p.prenom LIKE $2 OR 
+        p.rfid_uuid LIKE $3
+        ${queryId !== null ? "OR p.id = $4" : ""}
       )
     `;
 
-    const params: any[] = [`%${query}%`, `%${query}%`, `%${query}%`];
+    const params: any[] = [searchPattern, searchPattern, searchPattern];
+    let paramIndex = 4;
     if (queryId !== null) {
       params.push(queryId);
     }
 
     if (type && ["student", "teacher", "staff", "visitor"].includes(type)) {
-      sqlQuery += " AND p.type = ?";
+      sqlQuery += ` AND p.type = $${paramIndex}`;
       params.push(type);
+      paramIndex++;
     }
 
     sqlQuery += " ORDER BY p.nom, p.prenom LIMIT 50";
 
-    const results = db.prepare(sqlQuery).all(...params) as Person[];
+    const result = await sql.query(sqlQuery, params);
+    const results = result.rows as Person[];
 
     // For students, add payment info
-    const personsWithPayments = results.map((person) => {
-      if (person.type === "student") {
-        const personWithPayments = getPersonWithPayments(person.rfid_uuid);
-        return personWithPayments || person;
-      }
-      return person;
-    }).filter((p): p is PersonWithPayments => p !== null) as PersonWithPayments[];
+    const personsWithPayments = await Promise.all(
+      results.map(async (person) => {
+        if (person.type === "student") {
+          const personWithPayments = await getPersonWithPayments(person.rfid_uuid);
+          return personWithPayments || person;
+        }
+        return person;
+      })
+    );
 
     console.log(`🔍 Search: "${query}" - ${personsWithPayments.length} results`);
     return NextResponse.json(personsWithPayments);

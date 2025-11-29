@@ -1,6 +1,6 @@
 // app/api/attendance/route.ts
 import { NextRequest, NextResponse } from "next/server";
-import db from "@/lib/db";
+import sql from "@/lib/db";
 import { AttendanceLog } from "@/lib/types";
 
 export async function GET(request: NextRequest) {
@@ -15,6 +15,7 @@ export async function GET(request: NextRequest) {
     const action = searchParams.get("action"); // in or out
     const personId = searchParams.get("personId");
 
+    // Build query parts
     let query = `
       SELECT 
         a.id,
@@ -30,43 +31,52 @@ export async function GET(request: NextRequest) {
       WHERE 1=1
     `;
     const params: any[] = [];
+    let paramIndex = 1;
 
     if (startDate && endDate) {
-      query += " AND DATE(a.attendance_date) BETWEEN ? AND ?";
+      query += ` AND DATE(a.attendance_date) BETWEEN $${paramIndex} AND $${paramIndex + 1}`;
       params.push(startDate, endDate);
+      paramIndex += 2;
     } else if (startDate) {
-      query += " AND DATE(a.attendance_date) >= ?";
+      query += ` AND DATE(a.attendance_date) >= $${paramIndex}`;
       params.push(startDate);
+      paramIndex++;
     } else if (endDate) {
-      query += " AND DATE(a.attendance_date) <= ?";
+      query += ` AND DATE(a.attendance_date) <= $${paramIndex}`;
       params.push(endDate);
+      paramIndex++;
     } else if (date) {
-      query += " AND DATE(a.attendance_date) = ?";
+      query += ` AND DATE(a.attendance_date) = $${paramIndex}`;
       params.push(date);
+      paramIndex++;
     }
 
     if (status && (status === "success" || status === "failed")) {
-      query += " AND a.status = ?";
+      query += ` AND a.status = $${paramIndex}`;
       params.push(status);
+      paramIndex++;
     }
 
     if (action && (action === "in" || action === "out")) {
-      query += " AND a.action = ?";
+      query += ` AND a.action = $${paramIndex}`;
       params.push(action);
+      paramIndex++;
     }
 
     if (personId) {
       const parsedPersonId = parseInt(personId, 10);
       if (!Number.isNaN(parsedPersonId)) {
-        query += " AND a.person_id = ?";
+        query += ` AND a.person_id = $${paramIndex}`;
         params.push(parsedPersonId);
+        paramIndex++;
       }
     }
 
-    query += " ORDER BY a.attendance_date DESC LIMIT ? OFFSET ?";
+    query += ` ORDER BY a.attendance_date DESC LIMIT $${paramIndex} OFFSET $${paramIndex + 1}`;
     params.push(limit, offset);
 
-    const logs = db.prepare(query).all(...params) as AttendanceLog[];
+    const result = await sql.query(query, params);
+    const logs = result.rows as AttendanceLog[];
 
     console.log(`📋 ${logs.length} attendance records retrieved`);
     return NextResponse.json(logs);

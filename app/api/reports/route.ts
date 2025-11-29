@@ -1,6 +1,6 @@
 // app/api/reports/route.ts
 import { NextRequest, NextResponse } from "next/server";
-import db from "@/lib/db";
+import sql from "@/lib/db";
 
 export async function GET(request: NextRequest) {
   try {
@@ -25,9 +25,7 @@ export async function GET(request: NextRequest) {
     switch (reportType) {
       case "attendance": {
         // Attendance report
-        const attendanceData = db
-          .prepare(
-            `
+        const attendanceDataResult = await sql`
           SELECT 
             DATE(a.attendance_date) as date,
             COUNT(*) as total_scans,
@@ -36,17 +34,14 @@ export async function GET(request: NextRequest) {
             SUM(CASE WHEN a.action = 'in' THEN 1 ELSE 0 END) as entries,
             SUM(CASE WHEN a.action = 'out' THEN 1 ELSE 0 END) as exits
           FROM Attendance a
-          WHERE DATE(a.attendance_date) BETWEEN ? AND ?
+          WHERE DATE(a.attendance_date) BETWEEN ${startDate} AND ${endDate}
           GROUP BY DATE(a.attendance_date)
           ORDER BY date
-        `
-          )
-          .all(startDate, endDate);
+        `;
+        const attendanceData = attendanceDataResult.rows;
 
         // Statistics by person
-        const personStats = db
-          .prepare(
-            `
+        const personStatsResult = await sql`
           SELECT 
             p.id,
             p.nom,
@@ -59,12 +54,11 @@ export async function GET(request: NextRequest) {
             MAX(a.attendance_date) as last_scan
           FROM Attendance a
           JOIN Persons p ON a.person_id = p.id
-          WHERE DATE(a.attendance_date) BETWEEN ? AND ?
+          WHERE DATE(a.attendance_date) BETWEEN ${startDate} AND ${endDate}
           GROUP BY p.id
           ORDER BY total_scans DESC
-        `
-          )
-          .all(startDate, endDate);
+        `;
+        const personStats = personStatsResult.rows;
 
         report.type = "attendance";
         report.daily_summary = attendanceData;
@@ -74,9 +68,7 @@ export async function GET(request: NextRequest) {
 
       case "payments": {
         // Payments report
-        const paymentData = db
-          .prepare(
-            `
+        const paymentDataResult = await sql`
           SELECT 
             sp.trimester,
             COUNT(DISTINCT sp.student_id) as students_paid,
@@ -85,16 +77,13 @@ export async function GET(request: NextRequest) {
             COUNT(*) as payment_count
           FROM student_payments sp
           JOIN Payments p ON sp.payment_id = p.id
-          WHERE DATE(p.payment_date) BETWEEN ? AND ?
+          WHERE DATE(p.payment_date) BETWEEN ${startDate} AND ${endDate}
           GROUP BY sp.trimester, p.payment_method
-        `
-          )
-          .all(startDate, endDate);
+        `;
+        const paymentData = paymentDataResult.rows;
 
         // Detailed payment list
-        const detailedPayments = db
-          .prepare(
-            `
+        const detailedPaymentsResult = await sql`
           SELECT 
             per.nom,
             per.prenom,
@@ -105,11 +94,10 @@ export async function GET(request: NextRequest) {
           FROM student_payments sp
           JOIN Payments p ON sp.payment_id = p.id
           JOIN Persons per ON sp.student_id = per.id
-          WHERE DATE(p.payment_date) BETWEEN ? AND ?
+          WHERE DATE(p.payment_date) BETWEEN ${startDate} AND ${endDate}
           ORDER BY p.payment_date DESC
-        `
-          )
-          .all(startDate, endDate);
+        `;
+        const detailedPayments = detailedPaymentsResult.rows;
 
         report.type = "payments";
         report.summary = paymentData;
@@ -119,53 +107,19 @@ export async function GET(request: NextRequest) {
 
       case "summary": {
         // Global report (summary)
-        const totalScans = db
-          .prepare(
-            `
-          SELECT COUNT(*) as count FROM Attendance
-          WHERE DATE(attendance_date) BETWEEN ? AND ?
-        `
-          )
-          .get(startDate, endDate) as { count: number };
+        const [totalScansResult, successfulScansResult, failedScansResult, uniquePersonsResult, totalPaymentsResult] = await Promise.all([
+          sql`SELECT COUNT(*) as count FROM Attendance WHERE DATE(attendance_date) BETWEEN ${startDate} AND ${endDate}`,
+          sql`SELECT COUNT(*) as count FROM Attendance WHERE DATE(attendance_date) BETWEEN ${startDate} AND ${endDate} AND status = 'success'`,
+          sql`SELECT COUNT(*) as count FROM Attendance WHERE DATE(attendance_date) BETWEEN ${startDate} AND ${endDate} AND status = 'failed'`,
+          sql`SELECT COUNT(DISTINCT person_id) as count FROM Attendance WHERE DATE(attendance_date) BETWEEN ${startDate} AND ${endDate}`,
+          sql`SELECT COUNT(*) as count, SUM(p.amount) as total_amount FROM Payments p WHERE DATE(p.payment_date) BETWEEN ${startDate} AND ${endDate}`,
+        ]);
 
-        const successfulScans = db
-          .prepare(
-            `
-          SELECT COUNT(*) as count FROM Attendance
-          WHERE DATE(attendance_date) BETWEEN ? AND ? AND status = 'success'
-        `
-          )
-          .get(startDate, endDate) as { count: number };
-
-        const failedScans = db
-          .prepare(
-            `
-          SELECT COUNT(*) as count FROM Attendance
-          WHERE DATE(attendance_date) BETWEEN ? AND ? AND status = 'failed'
-        `
-          )
-          .get(startDate, endDate) as { count: number };
-
-        const uniquePersons = db
-          .prepare(
-            `
-          SELECT COUNT(DISTINCT person_id) as count FROM Attendance
-          WHERE DATE(attendance_date) BETWEEN ? AND ?
-        `
-          )
-          .get(startDate, endDate) as { count: number };
-
-        const totalPayments = db
-          .prepare(
-            `
-          SELECT 
-            COUNT(*) as count,
-            SUM(p.amount) as total_amount
-          FROM Payments p
-          WHERE DATE(p.payment_date) BETWEEN ? AND ?
-        `
-          )
-          .get(startDate, endDate) as any;
+        const totalScans = totalScansResult.rows[0] as { count: number };
+        const successfulScans = successfulScansResult.rows[0] as { count: number };
+        const failedScans = failedScansResult.rows[0] as { count: number };
+        const uniquePersons = uniquePersonsResult.rows[0] as { count: number };
+        const totalPayments = totalPaymentsResult.rows[0] as any;
 
         report.type = "summary";
         report.attendance = {

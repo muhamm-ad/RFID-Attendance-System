@@ -1,4 +1,4 @@
-import type Database from "better-sqlite3";
+import sql from "./db";
 
 type PersonType = "student" | "teacher" | "staff" | "visitor";
 
@@ -405,90 +405,77 @@ const PAYMENT_SEED: PaymentSeed[] = [
   { rfid_uuid: "STU-0013", trimester: 3, amount: 46000, payment_method: "bank_transfer" },
 ];
 
-export function seedDatabase(db: any) {
+export async function seedDatabase() {
   console.log("🌱 Ajout des données de test...");
 
-  const personsCount = db
-    .prepare("SELECT COUNT(*) as count FROM Persons")
-    .get() as { count: number };
+  const personsCountResult = await sql`
+    SELECT COUNT(*) as count FROM Persons
+  `;
+  const personsCount = personsCountResult.rows[0] as { count: number };
 
   if (personsCount.count > 0) {
     console.log("ℹ️ La base contient déjà des données, aucune action nécessaire.");
     return;
   }
 
-  const runSeed = db.transaction(() => {
-    const insertPerson = db.prepare(`
-      INSERT INTO Persons (rfid_uuid, type, nom, prenom, photo_path)
-      VALUES (?, ?, ?, ?, ?)
-    `);
-
+  // Use a transaction for all inserts
+  await sql.query("BEGIN");
+  try {
     const personIndex = new Map<
       string,
       { id: number; type: PersonSeed["type"] }
     >();
 
+    // Insert persons
     for (const person of PERSONS_SEED) {
-      const result = insertPerson.run(
-        person.rfid_uuid,
-        person.type,
-        person.nom,
-        person.prenom,
-        person.photo_path
-      );
+      const result = await sql`
+        INSERT INTO Persons (rfid_uuid, type, nom, prenom, photo_path)
+        VALUES (${person.rfid_uuid}, ${person.type}, ${person.nom}, ${person.prenom}, ${person.photo_path})
+        RETURNING id
+      `;
 
       personIndex.set(person.rfid_uuid, {
-        id: Number(result.lastInsertRowid),
+        id: result.rows[0].id,
         type: person.type,
       });
     }
 
-    const insertAttendance = db.prepare(`
-      INSERT INTO Attendance (person_id, action, status, attendance_date)
-      VALUES (?, ?, ?, ?)
-    `);
-
+    // Insert attendance records
     for (const entry of ATTENDANCE_SEED) {
       const personMeta = personIndex.get(entry.rfid_uuid);
       if (!personMeta) {
         continue;
       }
 
-      insertAttendance.run(
-        personMeta.id,
-        entry.action,
-        entry.status,
-        entry.attendance_date
-      );
+      await sql`
+        INSERT INTO Attendance (person_id, action, status, attendance_date)
+        VALUES (${personMeta.id}, ${entry.action}, ${entry.status}, ${entry.attendance_date})
+      `;
     }
 
-    const insertPayment = db.prepare(
-      "INSERT INTO Payments (amount, payment_method) VALUES (?, ?)"
-    );
-    const insertStudentPayment = db.prepare(
-      "INSERT INTO student_payments (student_id, payment_id, trimester) VALUES (?, ?, ?)"
-    );
-
+    // Insert payments
     for (const payment of PAYMENT_SEED) {
       const personMeta = personIndex.get(payment.rfid_uuid);
       if (!personMeta || personMeta.type !== "student") {
         continue;
       }
 
-      const paymentResult = insertPayment.run(
-        payment.amount,
-        payment.payment_method
-      );
+      const paymentResult = await sql`
+        INSERT INTO Payments (amount, payment_method)
+        VALUES (${payment.amount}, ${payment.payment_method})
+        RETURNING id
+      `;
 
-      insertStudentPayment.run(
-        personMeta.id,
-        Number(paymentResult.lastInsertRowid),
-        payment.trimester
-      );
+      await sql`
+        INSERT INTO student_payments (student_id, payment_id, trimester)
+        VALUES (${personMeta.id}, ${paymentResult.rows[0].id}, ${payment.trimester})
+      `;
     }
-  });
-
-  runSeed();
+    await sql.query("COMMIT");
+  } catch (error) {
+    await sql.query("ROLLBACK");
+    throw error;
+  }
 
   console.log("✅ Données de test ajoutées avec succès !");
 }

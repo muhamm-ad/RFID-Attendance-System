@@ -1,6 +1,6 @@
 // app/api/payments/route.ts
 import { NextRequest, NextResponse } from "next/server";
-import db from "@/lib/db";
+import sql from "@/lib/db";
 import { Payment, StudentPayment } from "@/lib/types";
 
 // POST: Register a payment for a student
@@ -35,23 +35,19 @@ export async function POST(request: NextRequest) {
     }
 
     // Check that the student exists and is of type student
-    const person = db
-      .prepare("SELECT * FROM Persons WHERE id = ? AND type = ?")
-      .get(student_id, "student");
-    if (!person) {
+    const personResult = await sql`
+      SELECT * FROM Persons WHERE id = ${student_id} AND type = 'student'
+    `;
+    if (personResult.rows.length === 0) {
       return NextResponse.json({ error: "Student not found" }, { status: 404 });
     }
 
     // Check if a payment already exists for this trimester
-    const existingPayment = db
-      .prepare(
-        `
-      SELECT * FROM student_payments WHERE student_id = ? AND trimester = ?
-    `
-      )
-      .get(student_id, trimester);
+    const existingPaymentResult = await sql`
+      SELECT * FROM student_payments WHERE student_id = ${student_id} AND trimester = ${trimester}
+    `;
 
-    if (existingPayment) {
+    if (existingPaymentResult.rows.length > 0) {
       return NextResponse.json(
         { error: `Payment for trimester ${trimester} already exists` },
         { status: 409 }
@@ -59,31 +55,23 @@ export async function POST(request: NextRequest) {
     }
 
     // Create the payment
-    const paymentResult = db
-      .prepare(
-        `
+    const paymentResult = await sql`
       INSERT INTO Payments (amount, payment_method)
-      VALUES (?, ?)
-    `
-      )
-      .run(amount, payment_method);
+      VALUES (${amount}, ${payment_method})
+      RETURNING *
+    `;
+
+    const paymentId = paymentResult.rows[0].id;
 
     // Link the payment to the student
-    const studentPaymentResult = db
-      .prepare(
-        `
+    const studentPaymentResult = await sql`
       INSERT INTO student_payments (student_id, payment_id, trimester)
-      VALUES (?, ?, ?)
-    `
-      )
-      .run(student_id, paymentResult.lastInsertRowid, trimester);
+      VALUES (${student_id}, ${paymentId}, ${trimester})
+      RETURNING *
+    `;
 
-    const newPayment = db
-      .prepare("SELECT * FROM Payments WHERE id = ?")
-      .get(paymentResult.lastInsertRowid) as Payment;
-    const newStudentPayment = db
-      .prepare("SELECT * FROM student_payments WHERE id = ?")
-      .get(studentPaymentResult.lastInsertRowid) as StudentPayment;
+    const newPayment = paymentResult.rows[0] as Payment;
+    const newStudentPayment = studentPaymentResult.rows[0] as StudentPayment;
 
     console.log(
       `✅ Payment registered for student ${student_id}, trimester ${trimester}`
@@ -118,9 +106,7 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    const payments = db
-      .prepare(
-        `
+    const result = await sql`
       SELECT 
         sp.id,
         sp.student_id,
@@ -131,11 +117,11 @@ export async function GET(request: NextRequest) {
         p.payment_date
       FROM student_payments sp
       JOIN Payments p ON sp.payment_id = p.id
-      WHERE sp.student_id = ?
+      WHERE sp.student_id = ${parseInt(student_id)}
       ORDER BY sp.trimester
-    `
-      )
-      .all(student_id);
+    `;
+
+    const payments = result.rows;
 
     return NextResponse.json(payments);
   } catch (error) {

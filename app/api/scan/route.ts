@@ -1,6 +1,5 @@
 // app/api/scan/route.ts
 import { NextRequest, NextResponse } from "next/server";
-import db from "@/lib/db";
 import { ScanResult } from "@/lib/types";
 import {
   getCurrentTrimester,
@@ -31,7 +30,7 @@ export async function POST(request: NextRequest) {
     console.log(`🔍 Badge scan: ${rfid_uuid} | Action: ${action}`);
 
     // Retrieve the person and their payment info directly by rfid_uuid
-    const person = getPersonWithPayments(rfid_uuid);
+    const person = await getPersonWithPayments(rfid_uuid);
 
     if (!person) {
       console.log(`⚠️ No person found for badge: ${rfid_uuid}`);
@@ -99,7 +98,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Record in Attendance table
-    logAccess(person.id, action, accessGranted ? "success" : "failed");
+    await logAccess(person.id, action, accessGranted ? "success" : "failed");
 
     const result: ScanResult = {
       success: true,

@@ -1,5 +1,5 @@
 // lib/utils.ts
-import db from "./db";
+import sql from "./db";
 import { PersonWithPayments, Person } from "./types";
 
 /**
@@ -19,43 +19,43 @@ export function getCurrentTrimester(): number {
 /**
  * Checks if a student has paid for a given trimester
  */
-export function hasStudentPaid(studentId: number, trimester: number): boolean {
-  const payment = db
-    .prepare(
-      `
+export async function hasStudentPaid(studentId: number, trimester: number): Promise<boolean> {
+  const result = await sql`
     SELECT sp.id 
     FROM student_payments sp
-    WHERE sp.student_id = ? AND sp.trimester = ?
-  `
-    )
-    .get(studentId, trimester);
+    WHERE sp.student_id = ${studentId} AND sp.trimester = ${trimester}
+  `;
 
-  return !!payment;
+  return result.rows.length > 0;
 }
 
 /**
  * Retrieves a person along with their payment information
  */
-export function getPersonWithPayments(
+export async function getPersonWithPayments(
   rfidUuid: string
-): PersonWithPayments | null {
-  const person = db
-    .prepare(
-      `
-    SELECT * FROM Persons WHERE rfid_uuid = ?
-  `
-    )
-    .get(rfidUuid) as Person | undefined;
+): Promise<PersonWithPayments | null> {
+  const result = await sql`
+    SELECT * FROM Persons WHERE rfid_uuid = ${rfidUuid}
+  `;
+
+  const person = result.rows[0] as Person | undefined;
 
   if (!person) return null;
 
   // If the person is a student, retrieve their payment info
   if (person.type === "student") {
+    const [trimester1_paid, trimester2_paid, trimester3_paid] = await Promise.all([
+      hasStudentPaid(person.id, 1),
+      hasStudentPaid(person.id, 2),
+      hasStudentPaid(person.id, 3),
+    ]);
+
     return {
       ...person,
-      trimester1_paid: hasStudentPaid(person.id, 1),
-      trimester2_paid: hasStudentPaid(person.id, 2),
-      trimester3_paid: hasStudentPaid(person.id, 3),
+      trimester1_paid,
+      trimester2_paid,
+      trimester3_paid,
     };
   }
 
@@ -71,19 +71,16 @@ export function getPersonWithPayments(
 /**
  * Logs an access attempt in the Attendance table
  */
-export function logAccess(
+export async function logAccess(
   personId: number,
   action: "in" | "out",
   status: "success" | "failed"
-): number {
-  const result = db
-    .prepare(
-      `
+): Promise<number> {
+  const result = await sql`
     INSERT INTO Attendance (person_id, action, status)
-    VALUES (?, ?, ?)
-  `
-    )
-    .run(personId, action, status);
+    VALUES (${personId}, ${action}, ${status})
+    RETURNING id
+  `;
 
-  return result.lastInsertRowid as number;
+  return result.rows[0].id as number;
 }

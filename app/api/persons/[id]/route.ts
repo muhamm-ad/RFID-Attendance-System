@@ -1,6 +1,6 @@
 // app/api/persons/[id]/route.ts
 import { NextRequest, NextResponse } from "next/server";
-import db from "@/lib/db";
+import sql from "@/lib/db";
 import { Person } from "@/lib/types";
 import { getPersonWithPayments } from "@/lib/utils";
 
@@ -17,9 +17,11 @@ export async function GET(
       return NextResponse.json({ error: "Invalid ID" }, { status: 400 });
     }
 
-    const person = db.prepare("SELECT * FROM Persons WHERE id = ?").get(id) as
-      | Person
-      | undefined;
+    const result = await sql`
+      SELECT * FROM Persons WHERE id = ${id}
+    `;
+
+    const person = result.rows[0] as Person | undefined;
 
     if (!person) {
       return NextResponse.json({ error: "Person not found" }, { status: 404 });
@@ -27,7 +29,7 @@ export async function GET(
 
     // If the person is a student, add payment info
     if (person.type === "student") {
-      const personWithPayments = getPersonWithPayments(person.rfid_uuid);
+      const personWithPayments = await getPersonWithPayments(person.rfid_uuid);
       return NextResponse.json(personWithPayments);
     }
 
@@ -55,36 +57,42 @@ export async function PUT(
     const { rfid_uuid, type, nom, prenom, photo_path } = body;
 
     // Check that the person exists
-    const existingPerson = db
-      .prepare("SELECT * FROM Persons WHERE id = ?")
-      .get(id);
-    if (!existingPerson) {
+    const existingResult = await sql`
+      SELECT * FROM Persons WHERE id = ${id}
+    `;
+    if (existingResult.rows.length === 0) {
       return NextResponse.json({ error: "Person not found" }, { status: 404 });
     }
 
     // Build update query dynamically based on provided fields
     const updates: string[] = [];
     const values: any[] = [];
+    let paramIndex = 1;
 
     if (rfid_uuid !== undefined) {
-      updates.push("rfid_uuid = ?");
+      updates.push(`rfid_uuid = $${paramIndex}`);
       values.push(rfid_uuid);
+      paramIndex++;
     }
     if (type !== undefined) {
-      updates.push("type = ?");
+      updates.push(`type = $${paramIndex}`);
       values.push(type);
+      paramIndex++;
     }
     if (nom !== undefined) {
-      updates.push("nom = ?");
+      updates.push(`nom = $${paramIndex}`);
       values.push(nom);
+      paramIndex++;
     }
     if (prenom !== undefined) {
-      updates.push("prenom = ?");
+      updates.push(`prenom = $${paramIndex}`);
       values.push(prenom);
+      paramIndex++;
     }
     if (photo_path !== undefined) {
-      updates.push("photo_path = ?");
+      updates.push(`photo_path = $${paramIndex}`);
       values.push(photo_path);
+      paramIndex++;
     }
 
     if (updates.length === 0) {
@@ -97,17 +105,19 @@ export async function PUT(
     updates.push("updated_at = CURRENT_TIMESTAMP");
     values.push(id);
 
-    db.prepare(
-      `
+    // Use sql.query for dynamic queries
+    const updateQuery = `
       UPDATE Persons 
       SET ${updates.join(", ")}
-      WHERE id = ?
-    `
-    ).run(...values);
+      WHERE id = $${paramIndex}
+    `;
 
-    const updatedPerson = db
-      .prepare("SELECT * FROM Persons WHERE id = ?")
-      .get(id) as Person;
+    await sql.query(updateQuery, values);
+
+    const updatedResult = await sql`
+      SELECT * FROM Persons WHERE id = ${id}
+    `;
+    const updatedPerson = updatedResult.rows[0] as Person;
 
     console.log(
       `✅ Person updated: ${updatedPerson.prenom} ${updatedPerson.nom}`
@@ -115,7 +125,7 @@ export async function PUT(
     return NextResponse.json(updatedPerson);
   } catch (error: any) {
     console.error("Error:", error);
-    if (error.message && error.message.includes("UNIQUE constraint failed")) {
+    if (error.message && (error.message.includes("UNIQUE constraint") || error.message.includes("duplicate key"))) {
       if (error.message.includes("rfid_uuid")) {
         return NextResponse.json(
           { error: "This RFID UUID is already associated with another person" },
@@ -150,7 +160,9 @@ export async function DELETE(
       return NextResponse.json({ error: "Invalid ID" }, { status: 400 });
     }
 
-    db.prepare("DELETE FROM Persons WHERE id = ?").run(id);
+    await sql`
+      DELETE FROM Persons WHERE id = ${id}
+    `;
 
     console.log(`🗑️ Person deleted (ID: ${id})`);
     return NextResponse.json({ message: "Person successfully deleted" });
