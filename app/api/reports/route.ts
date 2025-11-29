@@ -1,6 +1,6 @@
 // app/api/reports/route.ts
 import { NextRequest, NextResponse } from "next/server";
-import db from "@/lib/db";
+import prisma from "@/lib/db";
 
 export async function GET(request: NextRequest) {
   try {
@@ -16,6 +16,9 @@ export async function GET(request: NextRequest) {
       );
     }
 
+    const start = new Date(startDate);
+    const end = new Date(endDate + "T23:59:59");
+
     let report: any = {
       start_date: startDate,
       end_date: endDate,
@@ -25,46 +28,96 @@ export async function GET(request: NextRequest) {
     switch (reportType) {
       case "attendance": {
         // Attendance report
-        const attendanceData = db
-          .prepare(
-            `
-          SELECT 
-            DATE(a.attendance_date) as date,
-            COUNT(*) as total_scans,
-            SUM(CASE WHEN a.status = 'success' THEN 1 ELSE 0 END) as successful,
-            SUM(CASE WHEN a.status = 'failed' THEN 1 ELSE 0 END) as failed,
-            SUM(CASE WHEN a.action = 'in' THEN 1 ELSE 0 END) as entries,
-            SUM(CASE WHEN a.action = 'out' THEN 1 ELSE 0 END) as exits
-          FROM Attendance a
-          WHERE DATE(a.attendance_date) BETWEEN ? AND ?
-          GROUP BY DATE(a.attendance_date)
-          ORDER BY date
-        `
-          )
-          .all(startDate, endDate);
+        const attendanceRecords = await prisma.attendance.findMany({
+          where: {
+            attendance_date: {
+              gte: start,
+              lte: end,
+            },
+          },
+        });
+
+        // Group by date
+        const dailyMap = new Map<string, any>();
+        attendanceRecords.forEach((record) => {
+          const dateKey = record.attendance_date.toISOString().split("T")[0];
+          if (!dailyMap.has(dateKey)) {
+            dailyMap.set(dateKey, {
+              date: dateKey,
+              total_scans: 0,
+              successful: 0,
+              failed: 0,
+              entries: 0,
+              exits: 0,
+            });
+          }
+          const day = dailyMap.get(dateKey)!;
+          day.total_scans++;
+          if (record.status === "success") day.successful++;
+          if (record.status === "failed") day.failed++;
+          if (record.action === "in") day.entries++;
+          if (record.action === "out") day.exits++;
+        });
+
+        const attendanceData = Array.from(dailyMap.values()).sort(
+          (a, b) => a.date.localeCompare(b.date)
+        );
 
         // Statistics by person
-        const personStats = db
-          .prepare(
-            `
-          SELECT 
-            p.id,
-            p.nom,
-            p.prenom,
-            p.type,
-            COUNT(*) as total_scans,
-            SUM(CASE WHEN a.status = 'success' THEN 1 ELSE 0 END) as successful_scans,
-            SUM(CASE WHEN a.action = 'in' THEN 1 ELSE 0 END) as entries,
-            MIN(a.attendance_date) as first_scan,
-            MAX(a.attendance_date) as last_scan
-          FROM Attendance a
-          JOIN Persons p ON a.person_id = p.id
-          WHERE DATE(a.attendance_date) BETWEEN ? AND ?
-          GROUP BY p.id
-          ORDER BY total_scans DESC
-        `
-          )
-          .all(startDate, endDate);
+        const personStatsData = await prisma.attendance.groupBy({
+          by: ["person_id"],
+          where: {
+            attendance_date: {
+              gte: start,
+              lte: end,
+            },
+          },
+          _count: {
+            id: true,
+          },
+        });
+
+        const personStats = await Promise.all(
+          personStatsData.map(async (stat) => {
+            const person = await prisma.person.findUnique({
+              where: { id: stat.person_id },
+            });
+
+            const records = await prisma.attendance.findMany({
+              where: {
+                person_id: stat.person_id,
+                attendance_date: {
+                  gte: start,
+                  lte: end,
+                },
+              },
+            });
+
+            const successful = records.filter((r) => r.status === "success").length;
+            const entries = records.filter((r) => r.action === "in").length;
+            const dates = records.map((r) => r.attendance_date);
+
+            return {
+              id: person?.id,
+              nom: person?.nom,
+              prenom: person?.prenom,
+              type: person?.type,
+              total_scans: stat._count.id,
+              successful_scans: successful,
+              entries: entries,
+              first_scan: dates.length > 0 ? Math.min(...dates.map((d) => d.getTime())) : null,
+              last_scan: dates.length > 0 ? Math.max(...dates.map((d) => d.getTime())) : null,
+            };
+          })
+        );
+
+        // Format dates
+        personStats.forEach((stat: any) => {
+          if (stat.first_scan) stat.first_scan = new Date(stat.first_scan).toISOString();
+          if (stat.last_scan) stat.last_scan = new Date(stat.last_scan).toISOString();
+        });
+
+        personStats.sort((a: any, b: any) => b.total_scans - a.total_scans);
 
         report.type = "attendance";
         report.daily_summary = attendanceData;
@@ -74,42 +127,66 @@ export async function GET(request: NextRequest) {
 
       case "payments": {
         // Payments report
-        const paymentData = db
-          .prepare(
-            `
-          SELECT 
-            sp.trimester,
-            COUNT(DISTINCT sp.student_id) as students_paid,
-            SUM(p.amount) as total_amount,
-            p.payment_method,
-            COUNT(*) as payment_count
-          FROM student_payments sp
-          JOIN Payments p ON sp.payment_id = p.id
-          WHERE DATE(p.payment_date) BETWEEN ? AND ?
-          GROUP BY sp.trimester, p.payment_method
-        `
-          )
-          .all(startDate, endDate);
+        const payments = await prisma.payment.findMany({
+          where: {
+            payment_date: {
+              gte: start,
+              lte: end,
+            },
+          },
+          include: {
+            student_payments: {
+              include: {
+                student: true,
+              },
+            },
+          },
+        });
+
+        // Group by trimester and payment method
+        const summaryMap = new Map<string, any>();
+        payments.forEach((payment) => {
+          payment.student_payments.forEach((sp) => {
+            const key = `${sp.trimester}-${payment.payment_method}`;
+            if (!summaryMap.has(key)) {
+              summaryMap.set(key, {
+                trimester: sp.trimester,
+                payment_method: payment.payment_method,
+                students_paid: new Set(),
+                total_amount: 0,
+                payment_count: 0,
+              });
+          }
+            const summary = summaryMap.get(key)!;
+            summary.students_paid.add(sp.student_id);
+            summary.total_amount += payment.amount;
+            summary.payment_count++;
+          });
+        });
+
+        const paymentData = Array.from(summaryMap.values()).map((item) => ({
+          trimester: item.trimester,
+          students_paid: item.students_paid.size,
+          total_amount: item.total_amount,
+          payment_method: item.payment_method,
+          payment_count: item.payment_count,
+        }));
 
         // Detailed payment list
-        const detailedPayments = db
-          .prepare(
-            `
-          SELECT 
-            per.nom,
-            per.prenom,
-            sp.trimester,
-            p.amount,
-            p.payment_method,
-            p.payment_date
-          FROM student_payments sp
-          JOIN Payments p ON sp.payment_id = p.id
-          JOIN Persons per ON sp.student_id = per.id
-          WHERE DATE(p.payment_date) BETWEEN ? AND ?
-          ORDER BY p.payment_date DESC
-        `
-          )
-          .all(startDate, endDate);
+        const detailedPayments = payments.flatMap((payment) =>
+          payment.student_payments.map((sp) => ({
+            nom: sp.student.nom,
+            prenom: sp.student.prenom,
+            trimester: sp.trimester,
+            amount: payment.amount,
+            payment_method: payment.payment_method,
+            payment_date: payment.payment_date.toISOString(),
+          }))
+        );
+
+        detailedPayments.sort(
+          (a, b) => new Date(b.payment_date).getTime() - new Date(a.payment_date).getTime()
+        );
 
         report.type = "payments";
         report.summary = paymentData;
@@ -119,70 +196,81 @@ export async function GET(request: NextRequest) {
 
       case "summary": {
         // Global report (summary)
-        const totalScans = db
-          .prepare(
-            `
-          SELECT COUNT(*) as count FROM Attendance
-          WHERE DATE(attendance_date) BETWEEN ? AND ?
-        `
-          )
-          .get(startDate, endDate) as { count: number };
-
-        const successfulScans = db
-          .prepare(
-            `
-          SELECT COUNT(*) as count FROM Attendance
-          WHERE DATE(attendance_date) BETWEEN ? AND ? AND status = 'success'
-        `
-          )
-          .get(startDate, endDate) as { count: number };
-
-        const failedScans = db
-          .prepare(
-            `
-          SELECT COUNT(*) as count FROM Attendance
-          WHERE DATE(attendance_date) BETWEEN ? AND ? AND status = 'failed'
-        `
-          )
-          .get(startDate, endDate) as { count: number };
-
-        const uniquePersons = db
-          .prepare(
-            `
-          SELECT COUNT(DISTINCT person_id) as count FROM Attendance
-          WHERE DATE(attendance_date) BETWEEN ? AND ?
-        `
-          )
-          .get(startDate, endDate) as { count: number };
-
-        const totalPayments = db
-          .prepare(
-            `
-          SELECT 
-            COUNT(*) as count,
-            SUM(p.amount) as total_amount
-          FROM Payments p
-          WHERE DATE(p.payment_date) BETWEEN ? AND ?
-        `
-          )
-          .get(startDate, endDate) as any;
+        const [
+          totalScans,
+          successfulScans,
+          failedScans,
+          uniquePersons,
+          paymentsData,
+        ] = await Promise.all([
+          prisma.attendance.count({
+            where: {
+              attendance_date: {
+                gte: start,
+                lte: end,
+              },
+            },
+          }),
+          prisma.attendance.count({
+            where: {
+              attendance_date: {
+                gte: start,
+                lte: end,
+              },
+              status: "success",
+            },
+          }),
+          prisma.attendance.count({
+            where: {
+              attendance_date: {
+                gte: start,
+                lte: end,
+              },
+              status: "failed",
+            },
+          }),
+          prisma.attendance.findMany({
+            where: {
+              attendance_date: {
+                gte: start,
+                lte: end,
+              },
+            },
+            select: {
+              person_id: true,
+            },
+            distinct: ["person_id"],
+          }),
+          prisma.payment.aggregate({
+            where: {
+              payment_date: {
+                gte: start,
+                lte: end,
+              },
+            },
+            _count: {
+              id: true,
+            },
+            _sum: {
+              amount: true,
+            },
+          }),
+        ]);
 
         report.type = "summary";
         report.attendance = {
-          total_scans: totalScans.count,
-          successful: successfulScans.count,
-          failed: failedScans.count,
-          unique_persons: uniquePersons.count,
+          total_scans: totalScans,
+          successful: successfulScans,
+          failed: failedScans,
+          unique_persons: uniquePersons.length,
           success_rate:
-            totalScans.count > 0
-              ? `${((successfulScans.count / totalScans.count) * 100).toFixed(
-                  2
-                )}%`
+            totalScans > 0
+              ? `${((successfulScans / totalScans) * 100).toFixed(2)}%`
               : "0%",
         };
         report.payments = {
-          total_payments: totalPayments.count || 0,
-          total_amount: totalPayments.total_amount || 0,
+          total_payments: paymentsData._count.id || 0,
+          total_amount: paymentsData._sum.amount || 0,
         };
         break;
       }

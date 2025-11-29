@@ -1,5 +1,5 @@
 // lib/utils.ts
-import db from "./db";
+import prisma from "./db";
 import { PersonWithPayments, Person } from "./types";
 
 /**
@@ -19,16 +19,16 @@ export function getCurrentTrimester(): number {
 /**
  * Checks if a student has paid for a given trimester
  */
-export function hasStudentPaid(studentId: number, trimester: number): boolean {
-  const payment = db
-    .prepare(
-      `
-    SELECT sp.id 
-    FROM student_payments sp
-    WHERE sp.student_id = ? AND sp.trimester = ?
-  `
-    )
-    .get(studentId, trimester);
+export async function hasStudentPaid(
+  studentId: number,
+  trimester: number
+): Promise<boolean> {
+  const payment = await prisma.studentPayment.findFirst({
+    where: {
+      student_id: studentId,
+      trimester: trimester,
+    },
+  });
 
   return !!payment;
 }
@@ -36,16 +36,14 @@ export function hasStudentPaid(studentId: number, trimester: number): boolean {
 /**
  * Retrieves a person along with their payment information
  */
-export function getPersonWithPayments(
+export async function getPersonWithPayments(
   rfidUuid: string
-): PersonWithPayments | null {
-  const person = db
-    .prepare(
-      `
-    SELECT * FROM Persons WHERE rfid_uuid = ?
-  `
-    )
-    .get(rfidUuid) as Person | undefined;
+): Promise<PersonWithPayments | null> {
+  const person = await prisma.person.findUnique({
+    where: {
+      rfid_uuid: rfidUuid,
+    },
+  });
 
   if (!person) return null;
 
@@ -53,15 +51,19 @@ export function getPersonWithPayments(
   if (person.type === "student") {
     return {
       ...person,
-      trimester1_paid: hasStudentPaid(person.id, 1),
-      trimester2_paid: hasStudentPaid(person.id, 2),
-      trimester3_paid: hasStudentPaid(person.id, 3),
+      created_at: person.created_at.toISOString(),
+      updated_at: person.updated_at.toISOString(),
+      trimester1_paid: await hasStudentPaid(person.id, 1),
+      trimester2_paid: await hasStudentPaid(person.id, 2),
+      trimester3_paid: await hasStudentPaid(person.id, 3),
     };
   }
 
   // For other types (teacher, staff, visitor), payment is not required
   return {
     ...person,
+    created_at: person.created_at.toISOString(),
+    updated_at: person.updated_at.toISOString(),
     trimester1_paid: true,
     trimester2_paid: true,
     trimester3_paid: true,
@@ -71,19 +73,18 @@ export function getPersonWithPayments(
 /**
  * Logs an access attempt in the Attendance table
  */
-export function logAccess(
+export async function logAccess(
   personId: number,
   action: "in" | "out",
   status: "success" | "failed"
-): number {
-  const result = db
-    .prepare(
-      `
-    INSERT INTO Attendance (person_id, action, status)
-    VALUES (?, ?, ?)
-  `
-    )
-    .run(personId, action, status);
+): Promise<number> {
+  const result = await prisma.attendance.create({
+    data: {
+      person_id: personId,
+      action: action,
+      status: status,
+    },
+  });
 
-  return result.lastInsertRowid as number;
+  return result.id;
 }

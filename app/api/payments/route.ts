@@ -1,6 +1,6 @@
 // app/api/payments/route.ts
 import { NextRequest, NextResponse } from "next/server";
-import db from "@/lib/db";
+import prisma from "@/lib/db";
 import { Payment, StudentPayment } from "@/lib/types";
 
 // POST: Register a payment for a student
@@ -35,21 +35,24 @@ export async function POST(request: NextRequest) {
     }
 
     // Check that the student exists and is of type student
-    const person = db
-      .prepare("SELECT * FROM Persons WHERE id = ? AND type = ?")
-      .get(student_id, "student");
+    const person = await prisma.person.findFirst({
+      where: {
+        id: student_id,
+        type: "student",
+      },
+    });
+
     if (!person) {
       return NextResponse.json({ error: "Student not found" }, { status: 404 });
     }
 
     // Check if a payment already exists for this trimester
-    const existingPayment = db
-      .prepare(
-        `
-      SELECT * FROM student_payments WHERE student_id = ? AND trimester = ?
-    `
-      )
-      .get(student_id, trimester);
+    const existingPayment = await prisma.studentPayment.findFirst({
+      where: {
+        student_id: student_id,
+        trimester: trimester,
+      },
+    });
 
     if (existingPayment) {
       return NextResponse.json(
@@ -58,32 +61,25 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Create the payment
-    const paymentResult = db
-      .prepare(
-        `
-      INSERT INTO Payments (amount, payment_method)
-      VALUES (?, ?)
-    `
-      )
-      .run(amount, payment_method);
+    // Create the payment and link it to the student in a transaction
+    const result = await prisma.$transaction(async (tx) => {
+      const payment = await tx.payment.create({
+        data: {
+          amount: amount,
+          payment_method: payment_method as any,
+        },
+      });
 
-    // Link the payment to the student
-    const studentPaymentResult = db
-      .prepare(
-        `
-      INSERT INTO student_payments (student_id, payment_id, trimester)
-      VALUES (?, ?, ?)
-    `
-      )
-      .run(student_id, paymentResult.lastInsertRowid, trimester);
+      const studentPayment = await tx.studentPayment.create({
+        data: {
+          student_id: student_id,
+          payment_id: payment.id,
+          trimester: trimester,
+        },
+      });
 
-    const newPayment = db
-      .prepare("SELECT * FROM Payments WHERE id = ?")
-      .get(paymentResult.lastInsertRowid) as Payment;
-    const newStudentPayment = db
-      .prepare("SELECT * FROM student_payments WHERE id = ?")
-      .get(studentPaymentResult.lastInsertRowid) as StudentPayment;
+      return { payment, studentPayment };
+    });
 
     console.log(
       `✅ Payment registered for student ${student_id}, trimester ${trimester}`
@@ -91,8 +87,8 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json(
       {
-        payment: newPayment,
-        student_payment: newStudentPayment,
+        payment: result.payment,
+        student_payment: result.studentPayment,
       },
       { status: 201 }
     );
@@ -118,26 +114,29 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    const payments = db
-      .prepare(
-        `
-      SELECT 
-        sp.id,
-        sp.student_id,
-        sp.trimester,
-        p.id as payment_id,
-        p.amount,
-        p.payment_method,
-        p.payment_date
-      FROM student_payments sp
-      JOIN Payments p ON sp.payment_id = p.id
-      WHERE sp.student_id = ?
-      ORDER BY sp.trimester
-    `
-      )
-      .all(student_id);
+    const payments = await prisma.studentPayment.findMany({
+      where: {
+        student_id: parseInt(student_id),
+      },
+      include: {
+        payment: true,
+      },
+      orderBy: {
+        trimester: "asc",
+      },
+    });
 
-    return NextResponse.json(payments);
+    const formattedPayments = payments.map((sp) => ({
+      id: sp.id,
+      student_id: sp.student_id,
+      trimester: sp.trimester,
+      payment_id: sp.payment.id,
+      amount: sp.payment.amount,
+      payment_method: sp.payment.payment_method,
+      payment_date: sp.payment.payment_date.toISOString(),
+    }));
+
+    return NextResponse.json(formattedPayments);
   } catch (error) {
     console.error("❌ Error while retrieving payments:", error);
     return NextResponse.json(
