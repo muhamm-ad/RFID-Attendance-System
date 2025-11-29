@@ -1,4 +1,6 @@
-import type Database from "better-sqlite3";
+import { PrismaClient } from "@prisma/client";
+
+const prisma = new PrismaClient();
 
 type PersonType = "student" | "teacher" | "staff" | "visitor";
 
@@ -405,91 +407,84 @@ const PAYMENT_SEED: PaymentSeed[] = [
   { rfid_uuid: "STU-0013", trimester: 3, amount: 46000, payment_method: "bank_transfer" },
 ];
 
-export function seedDatabase(db: any) {
+async function main() {
   console.log("🌱 Ajout des données de test...");
 
-  const personsCount = db
-    .prepare("SELECT COUNT(*) as count FROM Persons")
-    .get() as { count: number };
+  const personsCount = await prisma.person.count();
 
-  if (personsCount.count > 0) {
+  if (personsCount > 0) {
     console.log("ℹ️ La base contient déjà des données, aucune action nécessaire.");
     return;
   }
 
-  const runSeed = db.transaction(() => {
-    const insertPerson = db.prepare(`
-      INSERT INTO Persons (rfid_uuid, type, nom, prenom, photo_path)
-      VALUES (?, ?, ?, ?, ?)
-    `);
+  // Create persons and store their IDs
+  const personIndex = new Map<string, { id: number; type: PersonSeed["type"] }>();
 
-    const personIndex = new Map<
-      string,
-      { id: number; type: PersonSeed["type"] }
-    >();
-
-    for (const person of PERSONS_SEED) {
-      const result = insertPerson.run(
-        person.rfid_uuid,
-        person.type,
-        person.nom,
-        person.prenom,
-        person.photo_path
-      );
-
-      personIndex.set(person.rfid_uuid, {
-        id: Number(result.lastInsertRowid),
+  for (const person of PERSONS_SEED) {
+    const created = await prisma.person.create({
+      data: {
+        rfid_uuid: person.rfid_uuid,
         type: person.type,
-      });
+        nom: person.nom,
+        prenom: person.prenom,
+        photo_path: person.photo_path,
+      },
+    });
+
+    personIndex.set(person.rfid_uuid, {
+      id: created.id,
+      type: person.type,
+    });
+  }
+
+  // Create attendance entries
+  for (const entry of ATTENDANCE_SEED) {
+    const personMeta = personIndex.get(entry.rfid_uuid);
+    if (!personMeta) {
+      continue;
     }
 
-    const insertAttendance = db.prepare(`
-      INSERT INTO Attendance (person_id, action, status, attendance_date)
-      VALUES (?, ?, ?, ?)
-    `);
+    await prisma.attendance.create({
+      data: {
+        person_id: personMeta.id,
+        action: entry.action,
+        status: entry.status,
+        attendance_date: new Date(entry.attendance_date),
+      },
+    });
+  }
 
-    for (const entry of ATTENDANCE_SEED) {
-      const personMeta = personIndex.get(entry.rfid_uuid);
-      if (!personMeta) {
-        continue;
-      }
-
-      insertAttendance.run(
-        personMeta.id,
-        entry.action,
-        entry.status,
-        entry.attendance_date
-      );
+  // Create payments and student payments
+  for (const payment of PAYMENT_SEED) {
+    const personMeta = personIndex.get(payment.rfid_uuid);
+    if (!personMeta || personMeta.type !== "student") {
+      continue;
     }
 
-    const insertPayment = db.prepare(
-      "INSERT INTO Payments (amount, payment_method) VALUES (?, ?)"
-    );
-    const insertStudentPayment = db.prepare(
-      "INSERT INTO student_payments (student_id, payment_id, trimester) VALUES (?, ?, ?)"
-    );
+    const createdPayment = await prisma.payment.create({
+      data: {
+        amount: payment.amount,
+        payment_method: payment.payment_method,
+      },
+    });
 
-    for (const payment of PAYMENT_SEED) {
-      const personMeta = personIndex.get(payment.rfid_uuid);
-      if (!personMeta || personMeta.type !== "student") {
-        continue;
-      }
-
-      const paymentResult = insertPayment.run(
-        payment.amount,
-        payment.payment_method
-      );
-
-      insertStudentPayment.run(
-        personMeta.id,
-        Number(paymentResult.lastInsertRowid),
-        payment.trimester
-      );
-    }
-  });
-
-  runSeed();
+    await prisma.studentPayment.create({
+      data: {
+        student_id: personMeta.id,
+        payment_id: createdPayment.id,
+        trimester: payment.trimester,
+      },
+    });
+  }
 
   console.log("✅ Données de test ajoutées avec succès !");
 }
 
+main()
+  .catch((e) => {
+    console.error(e);
+    process.exit(1);
+  })
+  .finally(async () => {
+    await prisma.$disconnect();
+  });

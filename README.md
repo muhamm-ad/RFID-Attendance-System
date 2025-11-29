@@ -5,24 +5,28 @@ A comprehensive attendance management and access control system based on RFID te
 ## Features
 
 ### Access Control
+
 - **RFID Scanning**: Automatic recording of entries and exits via RFID badges
 - **Payment Verification**: Automatic payment status check for students
 - **Multi-type Management**: Support for students, teachers, staff, and visitors
 - **Access Logs**: Complete history of all access attempts (success/failure)
 
 ### Person Management
+
 - **Full CRUD**: Create, read, update, and delete persons
 - **Person Types**: Students, teachers, administrative staff, visitors
 - **Photos**: Photo association for each person
 - **Search**: Quick search by name, first name, or RFID UUID
 
 ### Payment Management
+
 - **Trimester Payments**: Payment tracking for 3 trimesters
 - **Payment Methods**: Cash, card, bank transfer
 - **Payment Status**: Clear visualization of payment status by trimester
 - **Conditional Access Control**: Students must have paid the current trimester to access
 
 ### Statistics and Reports
+
 - **Statistics Dashboard**: Comprehensive system overview
 - **Statistics by Type**: Detailed analysis by person category
 - **Attendance Trends**: Evolution charts over a given period
@@ -31,6 +35,7 @@ A comprehensive attendance management and access control system based on RFID te
 - **Customizable Reports**: Report generation with advanced filters
 
 ### Activity Log
+
 - **Complete History**: All recorded RFID scans
 - **Advanced Filters**: By date, person type, status, action
 - **Export**: Ability to export data
@@ -38,7 +43,7 @@ A comprehensive attendance management and access control system based on RFID te
 ## Technologies Used
 
 - **Framework**: [Next.js 16](https://nextjs.org/) (React 19)
-- **Database**: [SQLite](https://www.sqlite.org/) with [better-sqlite3](https://github.com/WiseLibs/better-sqlite3)
+- **Database**: [PostgreSQL](https://www.postgresql.org/) with [Prisma](https://www.prisma.io/)
 - **Styling**: [Tailwind CSS 4](https://tailwindcss.com/)
 - **Icons**: [Lucide React](https://lucide.dev/)
 - **Language**: [TypeScript](https://www.typescriptlang.org/)
@@ -48,30 +53,71 @@ A comprehensive attendance management and access control system based on RFID te
 
 - **Node.js**: Version 18 or higher
 - **npm** or **yarn**: Package manager
-- **SQLite**: Included with Node.js (via better-sqlite3)
+- **PostgreSQL**: Database server (can be local or remote)
+- **Prisma**: ORM for database management
 
 ## Installation
 
 1. **Clone the repository** (or download the project)
+
 ```bash
 git clone <repository-url>
 cd rfid-attendance
 ```
 
 2. **Install dependencies**
+
 ```bash
 npm install
 ```
 
-3. **Initialize the database**
-The database is automatically initialized when the application starts. Test data (seed) is also automatically loaded.
+3. **Set up environment variables**
+Create a `.env` file in the root directory:
 
-4. **Run the application in development mode**
+```bash
+DATABASE_URL="postgresql://user:password@localhost:5432/rfid_attendance"
+```
+
+4. **Set up the database**
+
+```bash
+# Generate Prisma Client
+npx prisma generate
+
+# Run migrations
+npx prisma migrate dev --name init
+
+# Seed the database (optional)
+npx prisma db seed
+```
+
+3. **Set up environment variables**
+Create a `.env` file in the root directory:
+
+```bash
+DATABASE_URL="postgresql://user:password@localhost:5432/rfid_attendance"
+```
+
+4. **Set up the database**
+
+```bash
+# Generate Prisma Client
+npx prisma generate
+
+# Run migrations
+npx prisma migrate dev --name init
+
+# Seed the database (optional)
+npx prisma db seed
+```
+
+5. **Run the application in development mode**
+
 ```bash
 npm run dev
 ```
 
-5. **Access the application**
+6. **Access the application**
 Open your browser at: [http://localhost:3000](http://localhost:3000)
 
 The application automatically redirects to the dashboard: `/dashboard`
@@ -99,12 +145,13 @@ rfid-attendance/
 │   ├── Reports.tsx       # Reports
 │   ├── StatisticsDashboard.tsx # Statistics dashboard
 │   └── ThemeToggle.tsx   # Light/dark theme toggle
-├── database/             # SQLite database
-│   └── attendance.db     # Database file
+├── prisma/              # Prisma schema and migrations
+│   ├── schema.prisma    # Database schema
+│   └── seed.ts          # Database seed script
 ├── docs/                 # Documentation
 │   └── API.md           # Complete API documentation
 ├── lib/                  # Libraries and utilities
-│   ├── db.ts            # Database configuration and initialization
+│   ├── db.ts            # Prisma Client configuration
 │   ├── seed.ts          # Test data (seed)
 │   ├── types.ts          # TypeScript types
 │   └── utils.ts         # Utility functions
@@ -116,7 +163,7 @@ rfid-attendance/
 
 ## Database
 
-The system uses SQLite with the following tables:
+The system uses PostgreSQL with Prisma ORM. The database schema is defined in `prisma/schema.prisma`.
 
 ### Main Tables
 
@@ -195,6 +242,7 @@ curl -X POST http://localhost:3000/api/scan \
 ### Manage Persons
 
 Access the "Persons" tab in the dashboard to:
+
 - Add new persons
 - Modify existing information
 - Delete persons
@@ -203,6 +251,7 @@ Access the "Persons" tab in the dashboard to:
 ### Manage Payments
 
 In the "Payments" tab:
+
 - View all students and their payment status
 - Record a new payment
 - Filter by trimester
@@ -210,6 +259,7 @@ In the "Payments" tab:
 ### View Statistics
 
 The "Statistics" tab displays:
+
 - Total number of persons by type
 - Attendance statistics over a period
 - Trend charts
@@ -219,6 +269,7 @@ The "Statistics" tab displays:
 ### Generate Reports
 
 The "Reports" tab allows you to:
+
 - Filter by date, person type, status
 - Export data
 - View detailed reports
@@ -231,11 +282,12 @@ The system includes automatic test data (seed) that is loaded on first initializ
 - **Attendance data**: November 2024 - January 2025
 - **Payments**: Distributed across 3 trimesters
 
-Seed data is defined in `lib/seed.ts` and is only loaded if the database is empty.
+Seed data is defined in `prisma/seed.ts` and can be loaded using `npx prisma db seed`.
 
 ## User Interface
 
 The interface is modern and responsive, with:
+
 - **Clean Design**: Clear and intuitive interface
 - **Responsive**: Adapted for mobile, tablet, and desktop
 - **Light/Dark Theme**: Toggle available
@@ -267,6 +319,7 @@ npm run lint         # Check code with ESLint
 ## Contributing
 
 Contributions are welcome! Feel free to:
+
 1. Fork the project
 2. Create a branch for your feature
 3. Commit your changes
