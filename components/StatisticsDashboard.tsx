@@ -308,25 +308,12 @@ export default function StatisticsDashboard() {
       </div>
 
       {/* Attendance by Type */}
-      <div className="bg-white rounded-xl shadow-lg p-8">
-        <h3 className="text-xl font-bold text-gray-800 mb-6">Attendance by Type</h3>
-        <div className="space-y-4">
-          {stats.attendance_by_type.map((item) => (
-            <div key={item.type} className="p-4 bg-gray-50 rounded-lg">
-              <div className="flex items-center justify-between mb-2">
-                <span className="font-medium text-gray-800 capitalize">{item.type}</span>
-                <span className="text-sm text-gray-600">{item.count} total</span>
-              </div>
-              <div className="flex gap-4 text-sm">
-                <span className="text-green-600 font-medium">
-                  {item.success} successful
-                </span>
-                <span className="text-red-600 font-medium">{item.failed} failed</span>
-              </div>
-            </div>
-          ))}
+      {stats.attendance_by_type.length > 0 && (
+        <div className="bg-white rounded-xl shadow-lg p-8">
+          <h3 className="text-xl font-bold text-gray-800 mb-6">Attendance by Type</h3>
+          <AttendanceByTypeChart data={stats.attendance_by_type} />
         </div>
-      </div>
+      )}
 
       {/* Attendance Trend */}
       {stats.attendance_trend.length > 0 && (
@@ -406,22 +393,22 @@ export default function StatisticsDashboard() {
               </thead>
               <tbody className="bg-white divide-y divide-gray-200">
                 {stats.top_attendance.map((person, index) => (
-                  <tr key={person.id} className="hover:bg-gray-50">
+                  <tr key={person.id || index} className="hover:bg-gray-50">
                     <td className="px-4 py-3 whitespace-nowrap">
                       <span className="px-2 py-1 text-xs font-medium rounded-full bg-indigo-100 text-indigo-800">
                         #{index + 1}
                       </span>
                     </td>
                     <td className="px-4 py-3 whitespace-nowrap font-medium text-gray-900">
-                      {person.prenom} {person.nom}
+                      {person.prenom || ""} {person.nom || ""}
                     </td>
                     <td className="px-4 py-3 whitespace-nowrap">
                       <span className="px-2 py-1 text-xs font-medium rounded-full bg-gray-100 text-gray-800 capitalize">
-                        {person.type}
+                        {person.type || "N/A"}
                       </span>
                     </td>
                     <td className="px-4 py-3 whitespace-nowrap text-gray-600">
-                      {person.attendance_count}
+                      {person.attendance_count || 0}
                     </td>
                   </tr>
                 ))}
@@ -481,60 +468,39 @@ export default function StatisticsDashboard() {
 
 type TrendPoint = Stats["attendance_trend"][number];
 
-function TrendChart({ data }: { data: TrendPoint[] }) {
+type AttendanceByTypeItem = Stats["attendance_by_type"][number];
+
+function AttendanceByTypeChart({ data }: { data: AttendanceByTypeItem[] }) {
   if (data.length === 0) {
-    return <p className="text-sm text-gray-500">No trend data available.</p>;
+    return <p className="text-sm text-gray-500">No data available.</p>;
   }
 
-  const chartWidth = 600;
-  const chartHeight = 260;
-  const padding = 32;
-  const innerWidth = chartWidth - padding * 2;
-  const innerHeight = chartHeight - padding * 2;
-  const lineConfig: Array<{ key: keyof TrendPoint; color: string; label: string }> = [
-    { key: "total", color: "#4f46e5", label: "Total scans" },
-    { key: "entries", color: "#2563eb", label: "Entrées" },
-    { key: "exits", color: "#9333ea", label: "Sorties" },
-  ];
-  const maxValue =
-    Math.max(
-      ...lineConfig.flatMap((config) =>
-        data.map((point) => Number(point[config.key]) || 0)
-      )
-    ) || 1;
-  const stepX = data.length > 1 ? innerWidth / (data.length - 1) : innerWidth;
-
-  const buildPath = (key: keyof TrendPoint) => {
-    return data
-      .map((point, index) => {
-        const value = Number(point[key]) || 0;
-        const x = padding + index * stepX;
-        const y = chartHeight - padding - (value / maxValue) * innerHeight;
-        return `${index === 0 ? "M" : "L"}${x},${y}`;
-      })
-      .join(" ");
-  };
-
-  const formatLabel = (isoDate: string) => {
-    const dateObj = new Date(`${isoDate}T00:00:00`);
-    return dateObj.toLocaleDateString(undefined, {
-      weekday: "short",
-      day: "numeric",
-    });
-  };
+  const chartWidth = 800;
+  const chartHeight = 300;
+  const padding = { top: 20, right: 40, bottom: 60, left: 60 };
+  const innerWidth = chartWidth - padding.left - padding.right;
+  const innerHeight = chartHeight - padding.top - padding.bottom;
+  
+  const maxValue = Math.max(...data.map((item) => item.count)) || 1;
+  const barWidth = innerWidth / data.length - 20;
+  const barSpacing = 20;
 
   return (
-    <div className="w-full">
-      <div className="relative">
-        <svg viewBox={`0 0 ${chartWidth} ${chartHeight}`} className="w-full h-64">
+    <div className="w-full overflow-x-auto">
+      <div className="min-w-full">
+        <svg 
+          viewBox={`0 0 ${chartWidth} ${chartHeight}`} 
+          className="w-full h-auto"
+          preserveAspectRatio="xMidYMid meet"
+        >
           {/* Grid lines */}
-          {Array.from({ length: 4 }).map((_, index) => {
-            const y = padding + (innerHeight / 3) * index;
+          {Array.from({ length: 5 }).map((_, index) => {
+            const y = padding.top + (innerHeight / 4) * index;
             return (
               <line
                 key={`grid-${index}`}
-                x1={padding}
-                x2={chartWidth - padding}
+                x1={padding.left}
+                x2={chartWidth - padding.right}
                 y1={y}
                 y2={y}
                 stroke="#e5e7eb"
@@ -543,15 +509,325 @@ function TrendChart({ data }: { data: TrendPoint[] }) {
             );
           })}
 
-          {/* Lines */}
+          {/* Y-axis labels */}
+          {Array.from({ length: 5 }).map((_, index) => {
+            const value = Math.round((maxValue / 4) * (4 - index));
+            const y = padding.top + (innerHeight / 4) * index;
+            return (
+              <text
+                key={`y-label-${index}`}
+                x={padding.left - 10}
+                y={y + 4}
+                textAnchor="end"
+                className="text-xs fill-gray-600"
+                fontSize="12"
+              >
+                {value}
+              </text>
+            );
+          })}
+
+          {/* Bars */}
+          {data.map((item, index) => {
+            const x = padding.left + index * (barWidth + barSpacing) + barSpacing / 2;
+            const totalHeight = (item.count / maxValue) * innerHeight;
+            const successHeight = (item.success / maxValue) * innerHeight;
+            const failedHeight = (item.failed / maxValue) * innerHeight;
+            const barY = padding.top + innerHeight - totalHeight;
+
+            return (
+              <g key={item.type}>
+                {/* Total bar (background) */}
+                <rect
+                  x={x}
+                  y={barY}
+                  width={barWidth}
+                  height={totalHeight}
+                  fill="#e5e7eb"
+                  rx="4"
+                />
+                {/* Success bar */}
+                <rect
+                  x={x}
+                  y={barY + (totalHeight - successHeight)}
+                  width={barWidth}
+                  height={successHeight}
+                  fill="#10b981"
+                  rx="4"
+                />
+                {/* Failed bar */}
+                {item.failed > 0 && (
+                  <rect
+                    x={x}
+                    y={barY + (totalHeight - successHeight - failedHeight)}
+                    width={barWidth}
+                    height={failedHeight}
+                    fill="#ef4444"
+                    rx="4"
+                  />
+                )}
+                {/* Type label */}
+                <text
+                  x={x + barWidth / 2}
+                  y={chartHeight - padding.bottom + 20}
+                  textAnchor="middle"
+                  className="text-xs fill-gray-700 capitalize"
+                  fontSize="12"
+                >
+                  {item.type}
+                </text>
+                {/* Value label on top of bar */}
+                {item.count > 0 && (
+                  <text
+                    x={x + barWidth / 2}
+                    y={barY - 5}
+                    textAnchor="middle"
+                    className="text-xs fill-gray-800 font-medium"
+                    fontSize="11"
+                  >
+                    {item.count}
+                  </text>
+                )}
+              </g>
+            );
+          })}
+
+          {/* Y-axis line */}
+          <line
+            x1={padding.left}
+            y1={padding.top}
+            x2={padding.left}
+            y2={chartHeight - padding.bottom}
+            stroke="#d1d5db"
+            strokeWidth="2"
+          />
+
+          {/* X-axis line */}
+          <line
+            x1={padding.left}
+            y1={chartHeight - padding.bottom}
+            x2={chartWidth - padding.right}
+            y2={chartHeight - padding.bottom}
+            stroke="#d1d5db"
+            strokeWidth="2"
+          />
+        </svg>
+      </div>
+      <div className="mt-4 flex flex-wrap gap-4 text-sm justify-center">
+        <div className="flex items-center gap-2 text-gray-600">
+          <span className="inline-block h-3 w-6 rounded" style={{ backgroundColor: "#10b981" }} />
+          Successful
+        </div>
+        <div className="flex items-center gap-2 text-gray-600">
+          <span className="inline-block h-3 w-6 rounded" style={{ backgroundColor: "#ef4444" }} />
+          Failed
+        </div>
+        <div className="flex items-center gap-2 text-gray-600">
+          <span className="inline-block h-3 w-6 rounded" style={{ backgroundColor: "#e5e7eb" }} />
+          Total
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function TrendChart({ data }: { data: TrendPoint[] }) {
+  if (data.length === 0) {
+    return <p className="text-sm text-gray-500">No trend data available.</p>;
+  }
+
+  // Calculer la période totale pour déterminer l'intervalle d'affichage
+  const getTotalPeriodInDays = () => {
+    if (data.length < 2) return 0;
+    const startDate = new Date(`${data[0].date}T00:00:00`);
+    const endDate = new Date(`${data[data.length - 1].date}T00:00:00`);
+    const diffTime = endDate.getTime() - startDate.getTime();
+    return Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+  };
+
+  const totalDays = getTotalPeriodInDays();
+  const isOneMonthOrLess = totalDays <= 31;
+
+  // Adapter la largeur selon le nombre de points et la période
+  // Espacement optimal : minimum 40px entre les points pour les petites périodes
+  // Maximum 80px pour éviter un graphique trop large
+  const minSpacing = isOneMonthOrLess ? 40 : 60;
+  const maxSpacing = isOneMonthOrLess ? 80 : 100;
+  const optimalSpacing = Math.min(maxSpacing, Math.max(minSpacing, 800 / data.length));
+  
+  // Calculer la largeur optimale
+  const calculatedWidth = data.length * optimalSpacing;
+  const chartWidth = Math.max(800, Math.min(calculatedWidth, 2000)); // Min 800px, Max 2000px
+  const chartHeight = 350;
+  const padding = { top: 30, right: 50, bottom: 80, left: 70 };
+  const innerWidth = chartWidth - padding.left - padding.right;
+  const innerHeight = chartHeight - padding.top - padding.bottom;
+  
+  // Couleurs plus distinctes et visibles avec épaisseur augmentée
+  const lineConfig: Array<{ key: keyof TrendPoint; color: string; label: string; strokeWidth: number }> = [
+    { key: "total", color: "#6366f1", label: "Total scans", strokeWidth: 4 },
+    { key: "entries", color: "#10b981", label: "Entrées", strokeWidth: 3 },
+    { key: "exits", color: "#f59e0b", label: "Sorties", strokeWidth: 3 },
+  ];
+  
+  const maxValue =
+    Math.max(
+      ...lineConfig.flatMap((config) =>
+        data.map((point) => Number(point[config.key]) || 0)
+      )
+    ) || 1;
+  
+  const stepX = data.length > 1 ? innerWidth / (data.length - 1) : innerWidth;
+
+  const buildPath = (key: keyof TrendPoint) => {
+    return data
+      .map((point, index) => {
+        const value = Number(point[key]) || 0;
+        const x = padding.left + index * stepX;
+        const y = padding.top + innerHeight - (value / maxValue) * innerHeight;
+        return `${index === 0 ? "M" : "L"}${x},${y}`;
+      })
+      .join(" ");
+  };
+
+  const buildAreaPath = (key: keyof TrendPoint) => {
+    if (data.length === 0) return "";
+    const firstX = padding.left;
+    const lastX = padding.left + (data.length - 1) * stepX;
+    const baseY = padding.top + innerHeight;
+    
+    const path = data
+      .map((point, index) => {
+        const value = Number(point[key]) || 0;
+        const x = padding.left + index * stepX;
+        const y = padding.top + innerHeight - (value / maxValue) * innerHeight;
+        return `${x},${y}`;
+      })
+      .join(" ");
+    
+    return `M${firstX},${baseY} L${path} L${lastX},${baseY} Z`;
+  };
+
+  const formatLabel = (isoDate: string) => {
+    const dateObj = new Date(`${isoDate}T00:00:00`);
+    if (isOneMonthOrLess) {
+      // Pour les périodes d'un mois ou moins, afficher seulement le jour
+      return dateObj.toLocaleDateString(undefined, {
+        day: "numeric",
+      });
+    }
+    // Pour les périodes plus longues, afficher jour et mois
+    return dateObj.toLocaleDateString(undefined, {
+      day: "numeric",
+      month: "short",
+    });
+  };
+
+  // Afficher les dates selon la période
+  const getDatesToShow = () => {
+    if (data.length === 0) return [];
+    
+    // Si période <= 1 mois, afficher les jours
+    if (isOneMonthOrLess) {
+      const datesToShow: number[] = [];
+      // Afficher un jour sur 2 ou 3 selon le nombre de jours pour éviter la condensation
+      const interval = totalDays > 15 ? 2 : 1; // Si plus de 15 jours, afficher un jour sur 2
+      
+      for (let i = 0; i < data.length; i += interval) {
+        datesToShow.push(i);
+      }
+      
+      // Toujours afficher la dernière date si elle n'est pas déjà incluse
+      if (datesToShow[datesToShow.length - 1] !== data.length - 1) {
+        datesToShow.push(data.length - 1);
+      }
+      
+      return datesToShow;
+    }
+    
+    // Sinon, afficher avec un intervalle d'un mois
+    const datesToShow: number[] = [0]; // Toujours afficher la première date
+    
+    let lastShownDate = new Date(`${data[0].date}T00:00:00`);
+    
+    for (let i = 1; i < data.length; i++) {
+      const currentDate = new Date(`${data[i].date}T00:00:00`);
+      const monthsDiff = 
+        (currentDate.getFullYear() - lastShownDate.getFullYear()) * 12 +
+        (currentDate.getMonth() - lastShownDate.getMonth());
+      
+      // Afficher si c'est le premier jour du mois ou si un mois s'est écoulé
+      if (monthsDiff >= 1 || currentDate.getDate() === 1) {
+        datesToShow.push(i);
+        lastShownDate = currentDate;
+      }
+    }
+    
+    // Toujours afficher la dernière date si elle n'est pas déjà incluse
+    if (datesToShow[datesToShow.length - 1] !== data.length - 1) {
+      datesToShow.push(data.length - 1);
+    }
+    
+    return datesToShow;
+  };
+
+  const datesToShow = getDatesToShow();
+  const shouldShowLabel = (index: number) => datesToShow.includes(index);
+
+  return (
+    <div className="w-full overflow-x-auto">
+      <div style={{ minWidth: `${chartWidth}px` }}>
+        <svg 
+          width={chartWidth}
+          height={chartHeight}
+          viewBox={`0 0 ${chartWidth} ${chartHeight}`}
+          className="w-full h-auto"
+          preserveAspectRatio="xMidYMid meet"
+        >
+          {/* Grid lines */}
+          {Array.from({ length: 5 }).map((_, index) => {
+            const y = padding.top + (innerHeight / 4) * index;
+            return (
+              <line
+                key={`grid-${index}`}
+                x1={padding.left}
+                x2={chartWidth - padding.right}
+                y1={y}
+                y2={y}
+                stroke="#e5e7eb"
+                strokeDasharray="4 4"
+              />
+            );
+          })}
+
+          {/* Y-axis labels */}
+          {Array.from({ length: 5 }).map((_, index) => {
+            const value = Math.round((maxValue / 4) * (4 - index));
+            const y = padding.top + (innerHeight / 4) * index;
+            return (
+              <text
+                key={`y-label-${index}`}
+                x={padding.left - 15}
+                y={y + 4}
+                textAnchor="end"
+                className="text-xs fill-gray-600"
+                fontSize="12"
+              >
+                {value}
+              </text>
+            );
+          })}
+
+          {/* Lines - dessinées en dernier pour être au-dessus de tout */}
           {lineConfig.map((config) => (
             <path
               key={config.key as string}
               d={buildPath(config.key)}
               fill="none"
               stroke={config.color}
-              strokeWidth={3}
+              strokeWidth={config.strokeWidth}
               strokeLinecap="round"
+              strokeLinejoin="round"
             />
           ))}
 
@@ -559,33 +835,69 @@ function TrendChart({ data }: { data: TrendPoint[] }) {
           {lineConfig.map((config) =>
             data.map((point, index) => {
               const value = Number(point[config.key]) || 0;
-              const x = padding + index * stepX;
-              const y = chartHeight - padding - (value / maxValue) * innerHeight;
+              if (value === 0) return null;
+              const x = padding.left + index * stepX;
+              const y = padding.top + innerHeight - (value / maxValue) * innerHeight;
               return (
                 <circle
-                  key={`${config.key}-${point.date}`}
+                  key={`${config.key}-${point.date}-${index}`}
                   cx={x}
                   cy={y}
-                  r={3.5}
+                  r="4"
                   fill="#fff"
                   stroke={config.color}
-                  strokeWidth={2}
+                  strokeWidth="2.5"
                 />
               );
             })
           )}
+
+          {/* Y-axis line */}
+          <line
+            x1={padding.left}
+            y1={padding.top}
+            x2={padding.left}
+            y2={chartHeight - padding.bottom}
+            stroke="#d1d5db"
+            strokeWidth="2"
+          />
+
+          {/* X-axis line */}
+          <line
+            x1={padding.left}
+            y1={chartHeight - padding.bottom}
+            x2={chartWidth - padding.right}
+            y2={chartHeight - padding.bottom}
+            stroke="#d1d5db"
+            strokeWidth="2"
+          />
+
+          {/* X-axis labels - seulement ceux qui ne sont pas condensés */}
+          {data.map((point, index) => {
+            if (!shouldShowLabel(index)) return null;
+            const x = padding.left + index * stepX;
+            const y = chartHeight - padding.bottom + 25;
+            return (
+              <g key={`x-label-${point.date}-${index}`} transform={`translate(${x}, ${y}) rotate(-45)`}>
+                <text
+                  x={0}
+                  y={0}
+                  textAnchor="middle"
+                  className="text-xs fill-gray-700"
+                  fontSize="11"
+                >
+                  {formatLabel(point.date)}
+                </text>
+              </g>
+            );
+          })}
         </svg>
       </div>
-      <div className="mt-3 flex justify-between text-xs text-gray-500">
-        {data.map((point) => (
-          <span key={point.date}>{formatLabel(point.date)}</span>
-        ))}
-      </div>
-      <div className="mt-4 flex flex-wrap gap-4 text-sm">
+      <div className="mt-4 flex flex-wrap gap-4 text-sm justify-center">
         {lineConfig.map((config) => (
-          <div key={config.key as string} className="flex items-center gap-2 text-gray-600">
+          <div key={config.key as string} className="flex items-center gap-2 text-gray-700 font-medium">
             <span
-              className="inline-block h-2 w-6 rounded-full"
+              className="inline-block h-3 w-8 rounded-full"
               style={{ backgroundColor: config.color }}
             />
             {config.label}

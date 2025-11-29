@@ -30,6 +30,9 @@ export default function PersonManagement() {
     prenom: "",
     photo_path: "",
   });
+  const [selectedPhoto, setSelectedPhoto] = useState<File | null>(null);
+  const [photoPreview, setPhotoPreview] = useState<string | null>(null);
+  const [uploadingPhoto, setUploadingPhoto] = useState(false);
 
   useEffect(() => {
     loadPersons();
@@ -202,14 +205,45 @@ export default function PersonManagement() {
       prenom: "",
       photo_path: "",
     });
+    setSelectedPhoto(null);
+    setPhotoPreview(null);
     setEditingPerson(null);
     setShowForm(false);
+  }
+
+  async function handlePhotoUpload(file: File): Promise<string> {
+    const uploadFormData = new FormData();
+    uploadFormData.append("photo", file);
+    
+    const res = await fetch("/api/upload-photo", {
+      method: "POST",
+      body: uploadFormData,
+    });
+    
+    const data = await res.json();
+    if (!res.ok) throw new Error(data?.error || "Photo upload failed");
+    
+    return data.photo_path;
   }
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setError(null);
+    setUploadingPhoto(true);
+    
     try {
+      let photoPath = formData.photo_path;
+      
+      // Upload photo if a new file is selected
+      if (selectedPhoto) {
+        photoPath = await handlePhotoUpload(selectedPhoto);
+      }
+      
+      // If no photo is provided and it's a new person, show error
+      if (!photoPath && !editingPerson) {
+        throw new Error("Please select a photo");
+      }
+      
       const url = editingPerson
         ? `/api/persons/${editingPerson.id}`
         : "/api/persons";
@@ -218,7 +252,10 @@ export default function PersonManagement() {
       const res = await fetch(url, {
         method,
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(formData),
+        body: JSON.stringify({
+          ...formData,
+          photo_path: photoPath || formData.photo_path,
+        }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data?.error || "Operation failed");
@@ -227,6 +264,8 @@ export default function PersonManagement() {
       await loadPersons();
     } catch (e: any) {
       setError(e.message || "Unexpected error");
+    } finally {
+      setUploadingPhoto(false);
     }
   }
 
@@ -252,7 +291,22 @@ export default function PersonManagement() {
       prenom: person.prenom,
       photo_path: person.photo_path,
     });
+    setSelectedPhoto(null);
+    setPhotoPreview(person.photo_path || null);
     setShowForm(true);
+  }
+
+  function handlePhotoChange(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (file) {
+      setSelectedPhoto(file);
+      // Create preview
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setPhotoPreview(reader.result as string);
+      };
+      reader.readAsDataURL(file);
+    }
   }
 
   function handleSort(field: SortField) {
@@ -531,28 +585,41 @@ export default function PersonManagement() {
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Photo Path *
+                  Photo {!editingPerson ? "*" : ""}
                 </label>
+                {photoPreview && (
+                  <div className="mb-2">
+                    <img
+                      src={photoPreview}
+                      alt="Preview"
+                      className="w-24 h-24 object-cover rounded-lg border border-gray-300"
+                    />
+                  </div>
+                )}
                 <input
-                  type="text"
-                  value={formData.photo_path}
-                  onChange={(e) => setFormData({ ...formData, photo_path: e.target.value })}
-                  required
-                  placeholder="/photos/person.jpg"
+                  type="file"
+                  accept="image/jpeg,image/jpg,image/png,image/webp"
+                  onChange={handlePhotoChange}
+                  required={!editingPerson}
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
                 />
+                <p className="text-xs text-gray-500 mt-1">
+                  Formats acceptés: JPEG, PNG, WebP (max 5MB)
+                </p>
               </div>
               <div className="flex gap-3 pt-4">
                 <button
                   type="submit"
-                  className="flex-1 px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors"
+                  disabled={uploadingPhoto}
+                  className="flex-1 px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 disabled:opacity-50 transition-colors"
                 >
-                  {editingPerson ? "Update" : "Create"}
+                  {uploadingPhoto ? "Uploading..." : editingPerson ? "Update" : "Create"}
                 </button>
                 <button
                   type="button"
                   onClick={resetForm}
-                  className="flex-1 px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors"
+                  disabled={uploadingPhoto}
+                  className="flex-1 px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 disabled:opacity-50 transition-colors"
                 >
                   Cancel
                 </button>

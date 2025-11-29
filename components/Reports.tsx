@@ -256,10 +256,10 @@ export default function Reports() {
                             </td>
                             <td className="px-4 py-3 whitespace-nowrap">{person.entries}</td>
                             <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-600">
-                              {new Date(person.first_scan).toLocaleString()}
+                              {person.first_scan ? new Date(person.first_scan).toLocaleString() : "N/A"}
                             </td>
                             <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-600">
-                              {new Date(person.last_scan).toLocaleString()}
+                              {person.last_scan ? new Date(person.last_scan).toLocaleString() : "N/A"}
                             </td>
                           </tr>
                         ))}

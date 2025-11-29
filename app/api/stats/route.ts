@@ -154,20 +154,21 @@ export async function GET(request: NextRequest) {
       take: 10,
     });
 
-    const topAttendance = await Promise.all(
+    const topAttendance = (await Promise.all(
       topAttendanceData.map(async (item) => {
         const person = await prisma.person.findUnique({
           where: { id: item.person_id },
         });
+        if (!person) return null;
         return {
-          id: person?.id,
-          nom: person?.nom,
-          prenom: person?.prenom,
-          type: person?.type,
+          id: person.id,
+          nom: person.nom,
+          prenom: person.prenom,
+          type: person.type,
           attendance_count: item._count.id,
         };
       })
-    );
+    )).filter((item): item is NonNullable<typeof item> => item !== null);
 
     // 6. Latest entries/exits activity
     const recentActivityData = await prisma.attendance.findMany({
