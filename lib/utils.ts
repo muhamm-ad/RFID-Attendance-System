@@ -36,7 +36,7 @@ export async function getPersonWithPayments(
   rfidUuid: string
 ): Promise<PersonWithPayments | null> {
   const result = await sql`
-    SELECT * FROM Persons WHERE rfid_uuid = ${rfidUuid}
+    SELECT * FROM persons WHERE rfid_uuid = ${rfidUuid}
   `;
 
   const person = result.rows[0] as Person | undefined;
@@ -77,7 +77,7 @@ export async function logAccess(
   status: "success" | "failed"
 ): Promise<number> {
   const result = await sql`
-    INSERT INTO Attendance (person_id, action, status)
+    INSERT INTO attendance (person_id, action, status)
     VALUES (${personId}, ${action}, ${status})
     RETURNING id
   `;

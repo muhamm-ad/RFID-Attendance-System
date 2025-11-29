@@ -12,7 +12,9 @@ export async function GET(request: NextRequest) {
     const rawEnd = searchParams.get("endDate");
     const legacyDate = searchParams.get("date");
 
-    const normalizedStart = normalizeDate(rawStart || legacyDate || fallbackDate);
+    const normalizedStart = normalizeDate(
+      rawStart || legacyDate || fallbackDate
+    );
     const normalizedEnd = normalizeDate(rawEnd || legacyDate || fallbackDate);
 
     if (!normalizedStart || !normalizedEnd) {
@@ -31,12 +33,18 @@ export async function GET(request: NextRequest) {
     const rangeDays = calculateRangeDays(rangeStart, rangeEnd);
 
     // 1. General statistics
-    const [totalPersonsResult, totalStudentsResult, totalTeachersResult, totalStaffResult, totalVisitorsResult] = await Promise.all([
-      sql`SELECT COUNT(*) as count FROM Persons`,
-      sql`SELECT COUNT(*) as count FROM Persons WHERE type = 'student'`,
-      sql`SELECT COUNT(*) as count FROM Persons WHERE type = 'teacher'`,
-      sql`SELECT COUNT(*) as count FROM Persons WHERE type = 'staff'`,
-      sql`SELECT COUNT(*) as count FROM Persons WHERE type = 'visitor'`,
+    const [
+      totalPersonsResult,
+      totalStudentsResult,
+      totalTeachersResult,
+      totalStaffResult,
+      totalVisitorsResult,
+    ] = await Promise.all([
+      sql`SELECT COUNT(*) as count FROM persons`,
+      sql`SELECT COUNT(*) as count FROM persons WHERE type = 'student'`,
+      sql`SELECT COUNT(*) as count FROM persons WHERE type = 'teacher'`,
+      sql`SELECT COUNT(*) as count FROM persons WHERE type = 'staff'`,
+      sql`SELECT COUNT(*) as count FROM persons WHERE type = 'visitor'`,
     ]);
 
     const totalPersons = totalPersonsResult.rows[0] as { count: number };
@@ -53,7 +61,7 @@ export async function GET(request: NextRequest) {
         SUM(CASE WHEN status = 'failed' THEN 1 ELSE 0 END) as failed,
         SUM(CASE WHEN action = 'in' THEN 1 ELSE 0 END) as entries,
         SUM(CASE WHEN action = 'out' THEN 1 ELSE 0 END) as exits
-      FROM Attendance
+      FROM attendance
       WHERE DATE(attendance_date) BETWEEN DATE(${rangeStart}) AND DATE(${rangeEnd})
     `;
     const rangeAttendance = rangeAttendanceResult.rows[0] as any;
@@ -65,7 +73,7 @@ export async function GET(request: NextRequest) {
         COUNT(*) as count,
         SUM(CASE WHEN a.status = 'success' THEN 1 ELSE 0 END) as success,
         SUM(CASE WHEN a.status = 'failed' THEN 1 ELSE 0 END) as failed
-      FROM Attendance a
+      FROM attendance a
       JOIN Persons p ON a.person_id = p.id
       WHERE DATE(a.attendance_date) BETWEEN DATE(${rangeStart}) AND DATE(${rangeEnd})
       GROUP BY p.type
@@ -78,7 +86,7 @@ export async function GET(request: NextRequest) {
       SELECT 
         COUNT(DISTINCT p.id) as total_students,
         COUNT(DISTINCT sp.student_id) as students_paid
-      FROM Persons p
+      FROM persons p
       LEFT JOIN student_payments sp ON p.id = sp.student_id AND sp.trimester = ${currentTrimester}
       WHERE p.type = 'student'
     `;
@@ -100,7 +108,7 @@ export async function GET(request: NextRequest) {
         p.prenom,
         p.type,
         COUNT(*) as attendance_count
-      FROM Attendance a
+      FROM attendance a
       JOIN Persons p ON a.person_id = p.id
       WHERE DATE_TRUNC('month', a.attendance_date) = DATE_TRUNC('month', CURRENT_DATE)
       GROUP BY p.id
@@ -119,7 +127,7 @@ export async function GET(request: NextRequest) {
         p.nom,
         p.prenom,
         p.type
-      FROM Attendance a
+      FROM attendance a
       JOIN Persons p ON a.person_id = p.id
       ORDER BY a.attendance_date DESC
       LIMIT 20
@@ -135,7 +143,7 @@ export async function GET(request: NextRequest) {
         SUM(CASE WHEN status = 'failed' THEN 1 ELSE 0 END) as failed,
         SUM(CASE WHEN action = 'in' THEN 1 ELSE 0 END) as entries,
         SUM(CASE WHEN action = 'out' THEN 1 ELSE 0 END) as exits
-      FROM Attendance
+      FROM attendance
       WHERE DATE(attendance_date) BETWEEN DATE(${rangeStart}) AND DATE(${rangeEnd})
       GROUP BY DATE(attendance_date)
       ORDER BY DATE(attendance_date)

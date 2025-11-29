@@ -36,7 +36,7 @@ export async function POST(request: NextRequest) {
 
     // Check that the student exists and is of type student
     const personResult = await sql`
-      SELECT * FROM Persons WHERE id = ${student_id} AND type = 'student'
+      SELECT * FROM persons WHERE id = ${student_id} AND type = 'student'
     `;
     if (personResult.rows.length === 0) {
       return NextResponse.json({ error: "Student not found" }, { status: 404 });
@@ -56,7 +56,7 @@ export async function POST(request: NextRequest) {
 
     // Create the payment
     const paymentResult = await sql`
-      INSERT INTO Payments (amount, payment_method)
+      INSERT INTO payments (amount, payment_method)
       VALUES (${amount}, ${payment_method})
       RETURNING *
     `;

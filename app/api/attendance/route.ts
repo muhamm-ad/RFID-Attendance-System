@@ -16,7 +16,9 @@ export async function GET(request: NextRequest) {
     const personId = searchParams.get("personId");
 
     // Build query parts
-    let query = `
+    // Note: PostgreSQL table names are case-sensitive when quoted
+    // We use unquoted names which are case-insensitive and converted to lowercase
+    let queryText = `
       SELECT 
         a.id,
         a.person_id,
@@ -26,39 +28,41 @@ export async function GET(request: NextRequest) {
         p.nom || ' ' || p.prenom as person_name,
         p.type as person_type,
         p.rfid_uuid
-      FROM Attendance a
-      JOIN Persons p ON a.person_id = p.id
+      FROM attendance a
+      JOIN persons p ON a.person_id = p.id
       WHERE 1=1
     `;
     const params: any[] = [];
     let paramIndex = 1;
 
     if (startDate && endDate) {
-      query += ` AND DATE(a.attendance_date) BETWEEN $${paramIndex} AND $${paramIndex + 1}`;
+      queryText += ` AND DATE(a.attendance_date) BETWEEN $${paramIndex} AND $${
+        paramIndex + 1
+      }`;
       params.push(startDate, endDate);
       paramIndex += 2;
     } else if (startDate) {
-      query += ` AND DATE(a.attendance_date) >= $${paramIndex}`;
+      queryText += ` AND DATE(a.attendance_date) >= $${paramIndex}`;
       params.push(startDate);
       paramIndex++;
     } else if (endDate) {
-      query += ` AND DATE(a.attendance_date) <= $${paramIndex}`;
+      queryText += ` AND DATE(a.attendance_date) <= $${paramIndex}`;
       params.push(endDate);
       paramIndex++;
     } else if (date) {
-      query += ` AND DATE(a.attendance_date) = $${paramIndex}`;
+      queryText += ` AND DATE(a.attendance_date) = $${paramIndex}`;
       params.push(date);
       paramIndex++;
     }
 
     if (status && (status === "success" || status === "failed")) {
-      query += ` AND a.status = $${paramIndex}`;
+      queryText += ` AND a.status = $${paramIndex}`;
       params.push(status);
       paramIndex++;
     }
 
     if (action && (action === "in" || action === "out")) {
-      query += ` AND a.action = $${paramIndex}`;
+      queryText += ` AND a.action = $${paramIndex}`;
       params.push(action);
       paramIndex++;
     }
@@ -66,16 +70,19 @@ export async function GET(request: NextRequest) {
     if (personId) {
       const parsedPersonId = parseInt(personId, 10);
       if (!Number.isNaN(parsedPersonId)) {
-        query += ` AND a.person_id = $${paramIndex}`;
+        queryText += ` AND a.person_id = $${paramIndex}`;
         params.push(parsedPersonId);
         paramIndex++;
       }
     }
 
-    query += ` ORDER BY a.attendance_date DESC LIMIT $${paramIndex} OFFSET $${paramIndex + 1}`;
+    queryText += ` ORDER BY a.attendance_date DESC LIMIT $${paramIndex} OFFSET $${
+      paramIndex + 1
+    }`;
     params.push(limit, offset);
 
-    const result = await sql.query(query, params);
+    const { dbQuery } = await import("@/lib/db");
+    const result = await dbQuery(queryText, params);
     const logs = result.rows as AttendanceLog[];
 
     console.log(`📋 ${logs.length} attendance records retrieved`);

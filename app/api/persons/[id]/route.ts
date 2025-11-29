@@ -18,7 +18,7 @@ export async function GET(
     }
 
     const result = await sql`
-      SELECT * FROM Persons WHERE id = ${id}
+      SELECT * FROM persons WHERE id = ${id}
     `;
 
     const person = result.rows[0] as Person | undefined;
@@ -58,7 +58,7 @@ export async function PUT(
 
     // Check that the person exists
     const existingResult = await sql`
-      SELECT * FROM Persons WHERE id = ${id}
+      SELECT * FROM persons WHERE id = ${id}
     `;
     if (existingResult.rows.length === 0) {
       return NextResponse.json({ error: "Person not found" }, { status: 404 });
@@ -105,17 +105,17 @@ export async function PUT(
     updates.push("updated_at = CURRENT_TIMESTAMP");
     values.push(id);
 
-    // Use sql.query for dynamic queries
     const updateQuery = `
-      UPDATE Persons 
+      UPDATE persons 
       SET ${updates.join(", ")}
       WHERE id = $${paramIndex}
     `;
 
-    await sql.query(updateQuery, values);
+    const { dbQuery } = await import("@/lib/db");
+    await dbQuery(updateQuery, values);
 
     const updatedResult = await sql`
-      SELECT * FROM Persons WHERE id = ${id}
+      SELECT * FROM persons WHERE id = ${id}
     `;
     const updatedPerson = updatedResult.rows[0] as Person;
 
@@ -161,7 +161,7 @@ export async function DELETE(
     }
 
     await sql`
-      DELETE FROM Persons WHERE id = ${id}
+      DELETE FROM persons WHERE id = ${id}
     `;
 
     console.log(`🗑️ Person deleted (ID: ${id})`);

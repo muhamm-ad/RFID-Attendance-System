@@ -13,13 +13,13 @@ export async function GET(request: NextRequest) {
     let result;
     if (type && ["student", "teacher", "staff", "visitor"].includes(type)) {
       result = await sql`
-        SELECT * FROM Persons 
+        SELECT * FROM persons 
         WHERE type = ${type}
         ORDER BY nom, prenom
       `;
     } else {
       result = await sql`
-        SELECT * FROM Persons 
+        SELECT * FROM persons 
         ORDER BY nom, prenom
       `;
     }
@@ -83,7 +83,7 @@ export async function POST(request: NextRequest) {
 
     // Insert the new person with rfid_uuid
     const result = await sql`
-      INSERT INTO Persons (rfid_uuid, type, nom, prenom, photo_path)
+      INSERT INTO persons (rfid_uuid, type, nom, prenom, photo_path)
       VALUES (${rfid_uuid}, ${type}, ${nom}, ${prenom}, ${photo_path})
       RETURNING *
     `;
@@ -95,7 +95,11 @@ export async function POST(request: NextRequest) {
   } catch (error: any) {
     console.error("❌ Error while creating the person:", error);
 
-    if (error.message && (error.message.includes("UNIQUE constraint") || error.message.includes("duplicate key"))) {
+    if (
+      error.message &&
+      (error.message.includes("UNIQUE constraint") ||
+        error.message.includes("duplicate key"))
+    ) {
       if (error.message.includes("rfid_uuid")) {
         return NextResponse.json(
           { error: "This RFID UUID is already associated with a person" },

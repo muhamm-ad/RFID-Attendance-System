@@ -20,13 +20,12 @@ export async function GET(request: NextRequest) {
     // Check if query is a number (for ID search)
     const isNumeric = !isNaN(Number(query));
     const queryId = isNumeric ? Number(query) : null;
-
     const searchPattern = `%${query}%`;
 
-    let sqlQuery = `
+    let queryText = `
       SELECT 
         p.*
-      FROM Persons p
+      FROM persons p
       WHERE (
         p.nom LIKE $1 OR 
         p.prenom LIKE $2 OR 
@@ -42,28 +41,33 @@ export async function GET(request: NextRequest) {
     }
 
     if (type && ["student", "teacher", "staff", "visitor"].includes(type)) {
-      sqlQuery += ` AND p.type = $${paramIndex}`;
+      queryText += ` AND p.type = $${paramIndex}`;
       params.push(type);
       paramIndex++;
     }
 
-    sqlQuery += " ORDER BY p.nom, p.prenom LIMIT 50";
+    queryText += " ORDER BY p.nom, p.prenom LIMIT 50";
 
-    const result = await sql.query(sqlQuery, params);
+    const { dbQuery } = await import("@/lib/db");
+    const result = await dbQuery(queryText, params);
     const results = result.rows as Person[];
 
     // For students, add payment info
     const personsWithPayments = await Promise.all(
       results.map(async (person) => {
         if (person.type === "student") {
-          const personWithPayments = await getPersonWithPayments(person.rfid_uuid);
+          const personWithPayments = await getPersonWithPayments(
+            person.rfid_uuid
+          );
           return personWithPayments || person;
         }
         return person;
       })
     );
 
-    console.log(`🔍 Search: "${query}" - ${personsWithPayments.length} results`);
+    console.log(
+      `🔍 Search: "${query}" - ${personsWithPayments.length} results`
+    );
     return NextResponse.json(personsWithPayments);
   } catch (error) {
     console.error("❌ Error during search:", error);

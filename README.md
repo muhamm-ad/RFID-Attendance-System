@@ -72,18 +72,23 @@ npm install
 
 3. **Configure the database**
 
-   For local development, you'll need to set up environment variables for PostgreSQL:
+   **Important**: You need to set up the correct environment variables for PostgreSQL.
+
+   For local development, create a `.env.local` file:
 
    ```bash
    # .env.local
-   POSTGRES_URL="your-postgres-connection-string"
-   POSTGRES_PRISMA_URL="your-postgres-connection-string"
-   POSTGRES_URL_NON_POOLING="your-postgres-connection-string"
+   # For @vercel/postgres (pooled connection - required)
+   POSTGRES_URL="postgresql://user:password@host:port/database?sslmode=require"
+   
+   # Optional: fallback to DATABASE_URL if POSTGRES_URL is not set
+   DATABASE_URL="postgresql://user:password@host:port/database?sslmode=require"
    ```
 
-   For Vercel deployment:
+   **For Vercel deployment:**
    - Add a Vercel Postgres database in your Vercel project dashboard
-   - The connection variables will be automatically injected
+   - The connection variable `POSTGRES_URL` (pooled connection) will be automatically injected
+   - The app uses `createClient()` from `@vercel/postgres` which automatically handles the pooled connection
 
    The database is automatically initialized when the application starts. Test data (seed) is also automatically loaded.
 

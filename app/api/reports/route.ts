@@ -33,7 +33,7 @@ export async function GET(request: NextRequest) {
             SUM(CASE WHEN a.status = 'failed' THEN 1 ELSE 0 END) as failed,
             SUM(CASE WHEN a.action = 'in' THEN 1 ELSE 0 END) as entries,
             SUM(CASE WHEN a.action = 'out' THEN 1 ELSE 0 END) as exits
-          FROM Attendance a
+          FROM attendance a
           WHERE DATE(a.attendance_date) BETWEEN ${startDate} AND ${endDate}
           GROUP BY DATE(a.attendance_date)
           ORDER BY date
@@ -52,7 +52,7 @@ export async function GET(request: NextRequest) {
             SUM(CASE WHEN a.action = 'in' THEN 1 ELSE 0 END) as entries,
             MIN(a.attendance_date) as first_scan,
             MAX(a.attendance_date) as last_scan
-          FROM Attendance a
+          FROM attendance a
           JOIN Persons p ON a.person_id = p.id
           WHERE DATE(a.attendance_date) BETWEEN ${startDate} AND ${endDate}
           GROUP BY p.id
@@ -108,11 +108,11 @@ export async function GET(request: NextRequest) {
       case "summary": {
         // Global report (summary)
         const [totalScansResult, successfulScansResult, failedScansResult, uniquePersonsResult, totalPaymentsResult] = await Promise.all([
-          sql`SELECT COUNT(*) as count FROM Attendance WHERE DATE(attendance_date) BETWEEN ${startDate} AND ${endDate}`,
-          sql`SELECT COUNT(*) as count FROM Attendance WHERE DATE(attendance_date) BETWEEN ${startDate} AND ${endDate} AND status = 'success'`,
-          sql`SELECT COUNT(*) as count FROM Attendance WHERE DATE(attendance_date) BETWEEN ${startDate} AND ${endDate} AND status = 'failed'`,
-          sql`SELECT COUNT(DISTINCT person_id) as count FROM Attendance WHERE DATE(attendance_date) BETWEEN ${startDate} AND ${endDate}`,
-          sql`SELECT COUNT(*) as count, SUM(p.amount) as total_amount FROM Payments p WHERE DATE(p.payment_date) BETWEEN ${startDate} AND ${endDate}`,
+          sql`SELECT COUNT(*) as count FROM attendance WHERE DATE(attendance_date) BETWEEN ${startDate} AND ${endDate}`,
+          sql`SELECT COUNT(*) as count FROM attendance WHERE DATE(attendance_date) BETWEEN ${startDate} AND ${endDate} AND status = 'success'`,
+          sql`SELECT COUNT(*) as count FROM attendance WHERE DATE(attendance_date) BETWEEN ${startDate} AND ${endDate} AND status = 'failed'`,
+          sql`SELECT COUNT(DISTINCT person_id) as count FROM attendance WHERE DATE(attendance_date) BETWEEN ${startDate} AND ${endDate}`,
+          sql`SELECT COUNT(*) as count, SUM(p.amount) as total_amount FROM payments p WHERE DATE(p.payment_date) BETWEEN ${startDate} AND ${endDate}`,
         ]);
 
         const totalScans = totalScansResult.rows[0] as { count: number };

@@ -409,7 +409,7 @@ export async function seedDatabase() {
   console.log("🌱 Ajout des données de test...");
 
   const personsCountResult = await sql`
-    SELECT COUNT(*) as count FROM Persons
+    SELECT COUNT(*) as count FROM persons
   `;
   const personsCount = personsCountResult.rows[0] as { count: number };
 
@@ -429,7 +429,7 @@ export async function seedDatabase() {
     // Insert persons
     for (const person of PERSONS_SEED) {
       const result = await sql`
-        INSERT INTO Persons (rfid_uuid, type, nom, prenom, photo_path)
+        INSERT INTO persons (rfid_uuid, type, nom, prenom, photo_path)
         VALUES (${person.rfid_uuid}, ${person.type}, ${person.nom}, ${person.prenom}, ${person.photo_path})
         RETURNING id
       `;
@@ -448,7 +448,7 @@ export async function seedDatabase() {
       }
 
       await sql`
-        INSERT INTO Attendance (person_id, action, status, attendance_date)
+        INSERT INTO attendance (person_id, action, status, attendance_date)
         VALUES (${personMeta.id}, ${entry.action}, ${entry.status}, ${entry.attendance_date})
       `;
     }
@@ -461,7 +461,7 @@ export async function seedDatabase() {
       }
 
       const paymentResult = await sql`
-        INSERT INTO Payments (amount, payment_method)
+        INSERT INTO payments (amount, payment_method)
         VALUES (${payment.amount}, ${payment.payment_method})
         RETURNING id
       `;
