@@ -86,9 +86,7 @@ export async function PUT(
       data: updateData,
     });
 
-    console.log(
-      `✅ Person updated: ${updatedPerson.prenom} ${updatedPerson.nom}`
-    );
+    // console.log(`✅ Person updated: ${updatedPerson.prenom} ${updatedPerson.nom}`);
     return NextResponse.json(updatedPerson);
   } catch (error: any) {
     console.error("Error:", error);
@@ -132,7 +130,7 @@ export async function DELETE(
       where: { id },
     });
 
-    console.log(`🗑️ Person deleted (ID: ${id})`);
+    // console.log(`🗑️ Person deleted (ID: ${id})`);
     return NextResponse.json({ message: "Person successfully deleted" });
   } catch (error) {
     console.error("Error:", error);

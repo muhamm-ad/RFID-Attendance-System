@@ -41,7 +41,7 @@ export async function GET(request: NextRequest) {
       })
     );
 
-    console.log(`📋 ${personsWithPayments.length} persons retrieved`);
+    // console.log(`📋 ${personsWithPayments.length} persons retrieved`);
     return NextResponse.json(personsWithPayments);
   } catch (error) {
     console.error("❌ Error while retrieving persons:", error);
@@ -97,7 +97,7 @@ export async function POST(request: NextRequest) {
       },
     });
 
-    console.log(`✅ New person created: ${prenom} ${nom} (${type})`);
+    // console.log(`✅ New person created: ${prenom} ${nom} (${type})`);
     return NextResponse.json({
       ...newPerson,
       created_at: newPerson.created_at.toISOString(),

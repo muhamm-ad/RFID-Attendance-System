@@ -27,13 +27,13 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    console.log(`🔍 Badge scan: ${rfid_uuid} | Action: ${action}`);
+    // console.log(`🔍 Badge scan: ${rfid_uuid} | Action: ${action}`);
 
     // Retrieve the person and their payment info directly by rfid_uuid
     const person = await getPersonWithPayments(rfid_uuid);
 
     if (!person) {
-      console.log(`⚠️ No person found for badge: ${rfid_uuid}`);
+      // console.log(`⚠️ No person found for badge: ${rfid_uuid}`);
 
       const result: ScanResult = {
         success: true,
@@ -63,13 +63,13 @@ export async function POST(request: NextRequest) {
           ? `✅ Access granted - Student`
           : `❌ Payment required for trimester ${currentTrimester}`;
 
-        console.log(
-          `👨‍🎓 Student: ${person.prenom} ${person.nom} | ` +
-            `Trimester ${currentTrimester}: ${
-              isPaid ? "PAID" : "NOT PAID"
-            } | ` +
-            `Access: ${accessGranted ? "GRANTED" : "DENIED"}`
-        );
+        // console.log(
+        //   `👨‍🎓 Student: ${person.prenom} ${person.nom} | ` +
+        //     `Trimester ${currentTrimester}: ${
+        //       isPaid ? "PAID" : "NOT PAID"
+        //     } | ` +
+        //     `Access: ${accessGranted ? "GRANTED" : "DENIED"}`
+        // );
         break;
       }
 
@@ -80,9 +80,7 @@ export async function POST(request: NextRequest) {
         message = `✅ Access granted - ${
           person.type === "teacher" ? "Teacher" : "Staff"
         }`;
-        console.log(
-          `👨‍🏫 ${person.type}: ${person.prenom} ${person.nom} | Access: GRANTED`
-        );
+        // console.log(`👨‍🏫 ${person.type}: ${person.prenom} ${person.nom} | Access: GRANTED`);
         break;
       }
 
@@ -90,9 +88,7 @@ export async function POST(request: NextRequest) {
         // Visitors have access (you can add temporal validation logic if needed)
         accessGranted = true;
         message = "✅ Access granted - Visitor";
-        console.log(
-          `👥 Visitor: ${person.prenom} ${person.nom} | Access: GRANTED`
-        );
+        // console.log(`👥 Visitor: ${person.prenom} ${person.nom} | Access: GRANTED`);
         break;
       }
     }

@@ -30,7 +30,7 @@ export async function hasStudentPaid(
     },
   });
 
-  return result.rows.length > 0;
+  return payment !== null;
 }
 
 /**
@@ -59,9 +59,9 @@ export async function getPersonWithPayments(
       ...person,
       created_at: person.created_at.toISOString(),
       updated_at: person.updated_at.toISOString(),
-      trimester1_paid: await hasStudentPaid(person.id, 1),
-      trimester2_paid: await hasStudentPaid(person.id, 2),
-      trimester3_paid: await hasStudentPaid(person.id, 3),
+      trimester1_paid,
+      trimester2_paid,
+      trimester3_paid,
     };
   }
 

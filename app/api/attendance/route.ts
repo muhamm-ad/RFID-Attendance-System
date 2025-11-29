@@ -85,7 +85,7 @@ export async function GET(request: NextRequest) {
       rfid_uuid: log.person.rfid_uuid,
     }));
 
-    console.log(`📋 ${formattedLogs.length} attendance records retrieved`);
+    // console.log(`📋 ${formattedLogs.length} attendance records retrieved`);
     return NextResponse.json(formattedLogs);
   } catch (error) {
     console.error("❌ Error while retrieving attendance logs:", error);

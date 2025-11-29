@@ -284,9 +284,7 @@ export async function GET(request: NextRequest) {
         );
     }
 
-    console.log(
-      `📊 Report generated: ${reportType} (${startDate} to ${endDate})`
-    );
+    // console.log(`📊 Report generated: ${reportType} (${startDate} to ${endDate})`);
     return NextResponse.json(report);
   } catch (error) {
     console.error("❌ Error while generating report:", error);

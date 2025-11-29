@@ -407,7 +407,7 @@ const PAYMENT_SEED: PaymentSeed[] = [
   { rfid_uuid: "STU-0013", trimester: 3, amount: 46000, payment_method: "bank_transfer" },
 ];
 
-async function main() {
+export async function seedDatabase() {
   console.log("🌱 Ajout des données de test...");
 
   const personsCount = await prisma.person.count();
@@ -480,11 +480,18 @@ async function main() {
   console.log("✅ Données de test ajoutées avec succès !");
 }
 
-main()
-  .catch((e) => {
-    console.error(e);
-    process.exit(1);
-  })
-  .finally(async () => {
-    await prisma.$disconnect();
-  });
+async function main() {
+  await seedDatabase();
+}
+
+// Only run main if this file is executed directly (not imported)
+if (require.main === module) {
+  main()
+    .catch((e) => {
+      console.error(e);
+      process.exit(1);
+    })
+    .finally(async () => {
+      await prisma.$disconnect();
+    });
+}

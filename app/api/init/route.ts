@@ -1,12 +1,10 @@
 // app/api/init/route.ts
 // API route to initialize the database
 import { NextResponse } from "next/server";
-import { initDatabase } from "@/lib/db";
-import { seedDatabase } from "@/lib/seed";
+import { seedDatabase } from "../../../prisma/seed";
 
 export async function GET() {
   try {
-    await initDatabase();
     await seedDatabase();
     return NextResponse.json({ 
       success: true, 

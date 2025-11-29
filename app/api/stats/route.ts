@@ -269,7 +269,7 @@ export async function GET(request: NextRequest) {
       attendance_trend: attendanceTrend,
     };
 
-    console.log("📊 Statistics generated");
+    // console.log("📊 Statistics generated");
     return NextResponse.json(stats);
   } catch (error) {
     console.error("❌ Error while generating statistics:", error);

@@ -54,7 +54,7 @@ export async function POST(request: NextRequest) {
       },
     });
 
-    if (existingPaymentResult.rows.length > 0) {
+    if (existingPayment) {
       return NextResponse.json(
         { error: `Payment for trimester ${trimester} already exists` },
         { status: 409 }
@@ -81,9 +81,7 @@ export async function POST(request: NextRequest) {
       return { payment, studentPayment };
     });
 
-    console.log(
-      `✅ Payment registered for student ${student_id}, trimester ${trimester}`
-    );
+    // console.log(`✅ Payment registered for student ${student_id}, trimester ${trimester}`);
 
     return NextResponse.json(
       {

@@ -62,7 +62,7 @@ export async function GET(request: NextRequest) {
       (p): p is PersonWithPayments => p !== null
     ) as PersonWithPayments[];
 
-    console.log(`🔍 Search: "${query}" - ${filtered.length} results`);
+    // console.log(`🔍 Search: "${query}" - ${filtered.length} results`);
     return NextResponse.json(filtered);
   } catch (error) {
     console.error("❌ Error during search:", error);
