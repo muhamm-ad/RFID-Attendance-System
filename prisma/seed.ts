@@ -1,4 +1,6 @@
-import sql from "./db";
+import { PrismaClient } from "@prisma/client";
+
+const prisma = new PrismaClient();
 
 type PersonType = "student" | "teacher" | "staff" | "visitor";
 
@@ -405,78 +407,84 @@ const PAYMENT_SEED: PaymentSeed[] = [
   { rfid_uuid: "STU-0013", trimester: 3, amount: 46000, payment_method: "bank_transfer" },
 ];
 
-export async function seedDatabase() {
+async function main() {
   console.log("🌱 Ajout des données de test...");
 
-  const personsCountResult = await sql`
-    SELECT COUNT(*) as count FROM persons
-  `;
-  const personsCount = personsCountResult.rows[0] as { count: number };
+  const personsCount = await prisma.person.count();
 
-  if (personsCount.count > 0) {
+  if (personsCount > 0) {
     console.log("ℹ️ La base contient déjà des données, aucune action nécessaire.");
     return;
   }
 
-  // Use a transaction for all inserts
-  await sql.query("BEGIN");
-  try {
-    const personIndex = new Map<
-      string,
-      { id: number; type: PersonSeed["type"] }
-    >();
+  // Create persons and store their IDs
+  const personIndex = new Map<string, { id: number; type: PersonSeed["type"] }>();
 
-    // Insert persons
-    for (const person of PERSONS_SEED) {
-      const result = await sql`
-        INSERT INTO persons (rfid_uuid, type, nom, prenom, photo_path)
-        VALUES (${person.rfid_uuid}, ${person.type}, ${person.nom}, ${person.prenom}, ${person.photo_path})
-        RETURNING id
-      `;
-
-      personIndex.set(person.rfid_uuid, {
-        id: result.rows[0].id,
+  for (const person of PERSONS_SEED) {
+    const created = await prisma.person.create({
+      data: {
+        rfid_uuid: person.rfid_uuid,
         type: person.type,
-      });
+        nom: person.nom,
+        prenom: person.prenom,
+        photo_path: person.photo_path,
+      },
+    });
+
+    personIndex.set(person.rfid_uuid, {
+      id: created.id,
+      type: person.type,
+    });
+  }
+
+  // Create attendance entries
+  for (const entry of ATTENDANCE_SEED) {
+    const personMeta = personIndex.get(entry.rfid_uuid);
+    if (!personMeta) {
+      continue;
     }
 
-    // Insert attendance records
-    for (const entry of ATTENDANCE_SEED) {
-      const personMeta = personIndex.get(entry.rfid_uuid);
-      if (!personMeta) {
-        continue;
-      }
+    await prisma.attendance.create({
+      data: {
+        person_id: personMeta.id,
+        action: entry.action,
+        status: entry.status,
+        attendance_date: new Date(entry.attendance_date),
+      },
+    });
+  }
 
-      await sql`
-        INSERT INTO attendance (person_id, action, status, attendance_date)
-        VALUES (${personMeta.id}, ${entry.action}, ${entry.status}, ${entry.attendance_date})
-      `;
+  // Create payments and student payments
+  for (const payment of PAYMENT_SEED) {
+    const personMeta = personIndex.get(payment.rfid_uuid);
+    if (!personMeta || personMeta.type !== "student") {
+      continue;
     }
 
-    // Insert payments
-    for (const payment of PAYMENT_SEED) {
-      const personMeta = personIndex.get(payment.rfid_uuid);
-      if (!personMeta || personMeta.type !== "student") {
-        continue;
-      }
+    const createdPayment = await prisma.payment.create({
+      data: {
+        amount: payment.amount,
+        payment_method: payment.payment_method,
+      },
+    });
 
-      const paymentResult = await sql`
-        INSERT INTO payments (amount, payment_method)
-        VALUES (${payment.amount}, ${payment.payment_method})
-        RETURNING id
-      `;
-
-      await sql`
-        INSERT INTO student_payments (student_id, payment_id, trimester)
-        VALUES (${personMeta.id}, ${paymentResult.rows[0].id}, ${payment.trimester})
-      `;
-    }
-    await sql.query("COMMIT");
-  } catch (error) {
-    await sql.query("ROLLBACK");
-    throw error;
+    await prisma.studentPayment.create({
+      data: {
+        student_id: personMeta.id,
+        payment_id: createdPayment.id,
+        trimester: payment.trimester,
+      },
+    });
   }
 
   console.log("✅ Données de test ajoutées avec succès !");
 }
 
+main()
+  .catch((e) => {
+    console.error(e);
+    process.exit(1);
+  })
+  .finally(async () => {
+    await prisma.$disconnect();
+  });

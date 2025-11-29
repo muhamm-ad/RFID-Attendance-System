@@ -1,5 +1,5 @@
 // lib/utils.ts
-import sql from "./db";
+import prisma from "./db";
 import { PersonWithPayments, Person } from "./types";
 
 /**
@@ -19,12 +19,16 @@ export function getCurrentTrimester(): number {
 /**
  * Checks if a student has paid for a given trimester
  */
-export async function hasStudentPaid(studentId: number, trimester: number): Promise<boolean> {
-  const result = await sql`
-    SELECT sp.id 
-    FROM student_payments sp
-    WHERE sp.student_id = ${studentId} AND sp.trimester = ${trimester}
-  `;
+export async function hasStudentPaid(
+  studentId: number,
+  trimester: number
+): Promise<boolean> {
+  const payment = await prisma.studentPayment.findFirst({
+    where: {
+      student_id: studentId,
+      trimester: trimester,
+    },
+  });
 
   return result.rows.length > 0;
 }
@@ -35,11 +39,11 @@ export async function hasStudentPaid(studentId: number, trimester: number): Prom
 export async function getPersonWithPayments(
   rfidUuid: string
 ): Promise<PersonWithPayments | null> {
-  const result = await sql`
-    SELECT * FROM persons WHERE rfid_uuid = ${rfidUuid}
-  `;
-
-  const person = result.rows[0] as Person | undefined;
+  const person = await prisma.person.findUnique({
+    where: {
+      rfid_uuid: rfidUuid,
+    },
+  });
 
   if (!person) return null;
 
@@ -53,15 +57,19 @@ export async function getPersonWithPayments(
 
     return {
       ...person,
-      trimester1_paid,
-      trimester2_paid,
-      trimester3_paid,
+      created_at: person.created_at.toISOString(),
+      updated_at: person.updated_at.toISOString(),
+      trimester1_paid: await hasStudentPaid(person.id, 1),
+      trimester2_paid: await hasStudentPaid(person.id, 2),
+      trimester3_paid: await hasStudentPaid(person.id, 3),
     };
   }
 
   // For other types (teacher, staff, visitor), payment is not required
   return {
     ...person,
+    created_at: person.created_at.toISOString(),
+    updated_at: person.updated_at.toISOString(),
     trimester1_paid: true,
     trimester2_paid: true,
     trimester3_paid: true,
@@ -76,11 +84,13 @@ export async function logAccess(
   action: "in" | "out",
   status: "success" | "failed"
 ): Promise<number> {
-  const result = await sql`
-    INSERT INTO attendance (person_id, action, status)
-    VALUES (${personId}, ${action}, ${status})
-    RETURNING id
-  `;
+  const result = await prisma.attendance.create({
+    data: {
+      person_id: personId,
+      action: action,
+      status: status,
+    },
+  });
 
-  return result.rows[0].id as number;
+  return result.id;
 }

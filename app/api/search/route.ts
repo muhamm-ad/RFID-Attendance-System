@@ -1,6 +1,6 @@
 // app/api/search/route.ts
 import { NextRequest, NextResponse } from "next/server";
-import sql from "@/lib/db";
+import prisma from "@/lib/db";
 import { Person, PersonWithPayments } from "@/lib/types";
 import { getPersonWithPayments } from "@/lib/utils";
 
@@ -22,53 +22,48 @@ export async function GET(request: NextRequest) {
     const queryId = isNumeric ? Number(query) : null;
     const searchPattern = `%${query}%`;
 
-    let queryText = `
-      SELECT 
-        p.*
-      FROM persons p
-      WHERE (
-        p.nom LIKE $1 OR 
-        p.prenom LIKE $2 OR 
-        p.rfid_uuid LIKE $3
-        ${queryId !== null ? "OR p.id = $4" : ""}
-      )
-    `;
+    const where: any = {
+      OR: [
+        { nom: { contains: query, mode: "insensitive" } },
+        { prenom: { contains: query, mode: "insensitive" } },
+        { rfid_uuid: { contains: query, mode: "insensitive" } },
+      ],
+    };
 
-    const params: any[] = [searchPattern, searchPattern, searchPattern];
-    let paramIndex = 4;
     if (queryId !== null) {
-      params.push(queryId);
+      where.OR.push({ id: queryId });
     }
 
     if (type && ["student", "teacher", "staff", "visitor"].includes(type)) {
-      queryText += ` AND p.type = $${paramIndex}`;
-      params.push(type);
-      paramIndex++;
+      where.type = type;
     }
 
-    queryText += " ORDER BY p.nom, p.prenom LIMIT 50";
-
-    const { dbQuery } = await import("@/lib/db");
-    const result = await dbQuery(queryText, params);
-    const results = result.rows as Person[];
+    const results = await prisma.person.findMany({
+      where,
+      orderBy: [
+        { nom: "asc" },
+        { prenom: "asc" },
+      ],
+      take: 50,
+    });
 
     // For students, add payment info
     const personsWithPayments = await Promise.all(
       results.map(async (person) => {
         if (person.type === "student") {
-          const personWithPayments = await getPersonWithPayments(
-            person.rfid_uuid
-          );
+          const personWithPayments = await getPersonWithPayments(person.rfid_uuid);
           return personWithPayments || person;
         }
         return person;
       })
     );
 
-    console.log(
-      `🔍 Search: "${query}" - ${personsWithPayments.length} results`
-    );
-    return NextResponse.json(personsWithPayments);
+    const filtered = personsWithPayments.filter(
+      (p): p is PersonWithPayments => p !== null
+    ) as PersonWithPayments[];
+
+    console.log(`🔍 Search: "${query}" - ${filtered.length} results`);
+    return NextResponse.json(filtered);
   } catch (error) {
     console.error("❌ Error during search:", error);
     return NextResponse.json({ error: "Error during search" }, { status: 500 });

@@ -47,3 +47,4 @@ next-env.d.ts
 .vscode/
 .idea/
 .history
+.env*.local

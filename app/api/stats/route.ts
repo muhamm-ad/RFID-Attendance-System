@@ -1,6 +1,6 @@
 // app/api/stats/route.ts
 import { NextRequest, NextResponse } from "next/server";
-import sql from "@/lib/db";
+import prisma from "@/lib/db";
 
 const DAY_IN_MS = 24 * 60 * 60 * 1000;
 
@@ -31,66 +31,96 @@ export async function GET(request: NextRequest) {
     }
 
     const rangeDays = calculateRangeDays(rangeStart, rangeEnd);
+    const startDate = new Date(rangeStart);
+    const endDate = new Date(rangeEnd + "T23:59:59");
 
     // 1. General statistics
     const [
-      totalPersonsResult,
-      totalStudentsResult,
-      totalTeachersResult,
-      totalStaffResult,
-      totalVisitorsResult,
+      totalPersons,
+      totalStudents,
+      totalTeachers,
+      totalStaff,
+      totalVisitors,
     ] = await Promise.all([
-      sql`SELECT COUNT(*) as count FROM persons`,
-      sql`SELECT COUNT(*) as count FROM persons WHERE type = 'student'`,
-      sql`SELECT COUNT(*) as count FROM persons WHERE type = 'teacher'`,
-      sql`SELECT COUNT(*) as count FROM persons WHERE type = 'staff'`,
-      sql`SELECT COUNT(*) as count FROM persons WHERE type = 'visitor'`,
+      prisma.person.count(),
+      prisma.person.count({ where: { type: "student" } }),
+      prisma.person.count({ where: { type: "teacher" } }),
+      prisma.person.count({ where: { type: "staff" } }),
+      prisma.person.count({ where: { type: "visitor" } }),
     ]);
 
-    const totalPersons = totalPersonsResult.rows[0] as { count: number };
-    const totalStudents = totalStudentsResult.rows[0] as { count: number };
-    const totalTeachers = totalTeachersResult.rows[0] as { count: number };
-    const totalStaff = totalStaffResult.rows[0] as { count: number };
-    const totalVisitors = totalVisitorsResult.rows[0] as { count: number };
-
     // 2. Attendance statistics for selected range
-    const rangeAttendanceResult = await sql`
-      SELECT 
-        COUNT(*) as total,
-        SUM(CASE WHEN status = 'success' THEN 1 ELSE 0 END) as success,
-        SUM(CASE WHEN status = 'failed' THEN 1 ELSE 0 END) as failed,
-        SUM(CASE WHEN action = 'in' THEN 1 ELSE 0 END) as entries,
-        SUM(CASE WHEN action = 'out' THEN 1 ELSE 0 END) as exits
-      FROM attendance
-      WHERE DATE(attendance_date) BETWEEN DATE(${rangeStart}) AND DATE(${rangeEnd})
-    `;
-    const rangeAttendance = rangeAttendanceResult.rows[0] as any;
+    const rangeAttendanceRecords = await prisma.attendance.findMany({
+      where: {
+        attendance_date: {
+          gte: startDate,
+          lte: endDate,
+        },
+      },
+    });
+
+    const rangeAttendance = {
+      total: rangeAttendanceRecords.length,
+      success: rangeAttendanceRecords.filter((r) => r.status === "success").length,
+      failed: rangeAttendanceRecords.filter((r) => r.status === "failed").length,
+      entries: rangeAttendanceRecords.filter((r) => r.action === "in").length,
+      exits: rangeAttendanceRecords.filter((r) => r.action === "out").length,
+    };
 
     // 3. Attendance statistics by person type
-    const attendanceByTypeResult = await sql`
-      SELECT 
-        p.type,
-        COUNT(*) as count,
-        SUM(CASE WHEN a.status = 'success' THEN 1 ELSE 0 END) as success,
-        SUM(CASE WHEN a.status = 'failed' THEN 1 ELSE 0 END) as failed
-      FROM attendance a
-      JOIN Persons p ON a.person_id = p.id
-      WHERE DATE(a.attendance_date) BETWEEN DATE(${rangeStart}) AND DATE(${rangeEnd})
-      GROUP BY p.type
-    `;
-    const attendanceByType = attendanceByTypeResult.rows;
+    const attendanceByTypeData = await prisma.attendance.findMany({
+      where: {
+        attendance_date: {
+          gte: startDate,
+          lte: endDate,
+        },
+      },
+      include: {
+        person: {
+          select: {
+            type: true,
+          },
+        },
+      },
+    });
+
+    const typeMap = new Map<string, { count: number; success: number; failed: number }>();
+    attendanceByTypeData.forEach((record) => {
+      const type = record.person.type;
+      if (!typeMap.has(type)) {
+        typeMap.set(type, { count: 0, success: 0, failed: 0 });
+      }
+      const stats = typeMap.get(type)!;
+      stats.count++;
+      if (record.status === "success") stats.success++;
+      if (record.status === "failed") stats.failed++;
+    });
+
+    const attendanceByType = Array.from(typeMap.entries()).map(([type, stats]) => ({
+      type,
+      ...stats,
+    }));
 
     // 4. Payment statistics
     const currentTrimester = getCurrentTrimester();
-    const paymentStatsResult = await sql`
-      SELECT 
-        COUNT(DISTINCT p.id) as total_students,
-        COUNT(DISTINCT sp.student_id) as students_paid
-      FROM persons p
-      LEFT JOIN student_payments sp ON p.id = sp.student_id AND sp.trimester = ${currentTrimester}
-      WHERE p.type = 'student'
-    `;
-    const paymentStats = paymentStatsResult.rows[0] as any;
+    const totalStudentsCount = await prisma.person.count({
+      where: { type: "student" },
+    });
+    const studentsPaid = await prisma.studentPayment.findMany({
+      where: {
+        trimester: currentTrimester,
+      },
+      select: {
+        student_id: true,
+      },
+    });
+    const uniqueStudentIds = new Set(studentsPaid.map((sp) => sp.student_id));
+    const studentsPaidCount = uniqueStudentIds.size;
+
+    const paymentStats = {
+      total_students: totalStudentsCount,
+      students_paid: studentsPaidCount,
+    };
 
     const paymentRate =
       paymentStats.total_students > 0
@@ -101,63 +131,108 @@ export async function GET(request: NextRequest) {
         : 0;
 
     // 5. Top 10 persons with the most entrances this month
-    const topAttendanceResult = await sql`
-      SELECT 
-        p.id,
-        p.nom,
-        p.prenom,
-        p.type,
-        COUNT(*) as attendance_count
-      FROM attendance a
-      JOIN Persons p ON a.person_id = p.id
-      WHERE DATE_TRUNC('month', a.attendance_date) = DATE_TRUNC('month', CURRENT_DATE)
-      GROUP BY p.id
-      ORDER BY attendance_count DESC
-      LIMIT 10
-    `;
-    const topAttendance = topAttendanceResult.rows;
+    const currentMonth = new Date();
+    const monthStart = new Date(currentMonth.getFullYear(), currentMonth.getMonth(), 1);
+    const monthEnd = new Date(currentMonth.getFullYear(), currentMonth.getMonth() + 1, 0, 23, 59, 59);
+
+    const topAttendanceData = await prisma.attendance.groupBy({
+      by: ["person_id"],
+      where: {
+        attendance_date: {
+          gte: monthStart,
+          lte: monthEnd,
+        },
+      },
+      _count: {
+        id: true,
+      },
+      orderBy: {
+        _count: {
+          id: "desc",
+        },
+      },
+      take: 10,
+    });
+
+    const topAttendance = await Promise.all(
+      topAttendanceData.map(async (item) => {
+        const person = await prisma.person.findUnique({
+          where: { id: item.person_id },
+        });
+        return {
+          id: person?.id,
+          nom: person?.nom,
+          prenom: person?.prenom,
+          type: person?.type,
+          attendance_count: item._count.id,
+        };
+      })
+    );
 
     // 6. Latest entries/exits activity
-    const recentActivityResult = await sql`
-      SELECT 
-        a.id,
-        a.action,
-        a.status,
-        a.attendance_date,
-        p.nom,
-        p.prenom,
-        p.type
-      FROM attendance a
-      JOIN Persons p ON a.person_id = p.id
-      ORDER BY a.attendance_date DESC
-      LIMIT 20
-    `;
-    const recentActivity = recentActivityResult.rows;
+    const recentActivityData = await prisma.attendance.findMany({
+      include: {
+        person: {
+          select: {
+            nom: true,
+            prenom: true,
+            type: true,
+          },
+        },
+      },
+      orderBy: {
+        attendance_date: "desc",
+      },
+      take: 20,
+    });
+
+    const recentActivity = recentActivityData.map((record) => ({
+      id: record.id,
+      action: record.action,
+      status: record.status,
+      attendance_date: record.attendance_date.toISOString(),
+      nom: record.person.nom,
+      prenom: record.person.prenom,
+      type: record.person.type,
+    }));
 
     // 7. Attendance trend for the selected range
-    const rawTrendResult = await sql`
-      SELECT 
-        DATE(attendance_date) as date,
-        COUNT(*) as total,
-        SUM(CASE WHEN status = 'success' THEN 1 ELSE 0 END) as success,
-        SUM(CASE WHEN status = 'failed' THEN 1 ELSE 0 END) as failed,
-        SUM(CASE WHEN action = 'in' THEN 1 ELSE 0 END) as entries,
-        SUM(CASE WHEN action = 'out' THEN 1 ELSE 0 END) as exits
-      FROM attendance
-      WHERE DATE(attendance_date) BETWEEN DATE(${rangeStart}) AND DATE(${rangeEnd})
-      GROUP BY DATE(attendance_date)
-      ORDER BY DATE(attendance_date)
-    `;
-    const rawTrend = rawTrendResult.rows as Array<{
-      date: string;
+    const trendRecords = await prisma.attendance.findMany({
+      where: {
+        attendance_date: {
+          gte: startDate,
+          lte: endDate,
+        },
+      },
+    });
+
+    const trendMap = new Map<string, {
       total: number;
       success: number;
       failed: number;
       entries: number;
       exits: number;
-    }>;
+    }>();
 
-    const trendMap = new Map(rawTrend.map((point) => [point.date, point]));
+    trendRecords.forEach((record) => {
+      const dateKey = record.attendance_date.toISOString().split("T")[0];
+      if (!trendMap.has(dateKey)) {
+        trendMap.set(dateKey, {
+          total: 0,
+          success: 0,
+          failed: 0,
+          entries: 0,
+          exits: 0,
+        });
+      }
+      const day = trendMap.get(dateKey)!;
+      day.total++;
+      if (record.status === "success") day.success++;
+      if (record.status === "failed") day.failed++;
+      if (record.action === "in") day.entries++;
+      if (record.action === "out") day.exits++;
+    });
+
     const attendanceTrend = buildTrend(rangeStart, rangeEnd, trendMap);
 
     const stats = {
@@ -167,11 +242,11 @@ export async function GET(request: NextRequest) {
         days: rangeDays,
       },
       general: {
-        total_persons: totalPersons.count,
-        total_students: totalStudents.count,
-        total_teachers: totalTeachers.count,
-        total_staff: totalStaff.count,
-        total_visitors: totalVisitors.count,
+        total_persons: totalPersons,
+        total_students: totalStudents,
+        total_teachers: totalTeachers,
+        total_staff: totalStaff,
+        total_visitors: totalVisitors,
       },
       attendance_summary: {
         total: rangeAttendance.total || 0,
@@ -232,7 +307,6 @@ function buildTrend(
   trendMap: Map<
     string,
     {
-      date: string;
       total: number;
       success: number;
       failed: number;

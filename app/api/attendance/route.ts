@@ -1,6 +1,6 @@
 // app/api/attendance/route.ts
 import { NextRequest, NextResponse } from "next/server";
-import sql from "@/lib/db";
+import prisma from "@/lib/db";
 import { AttendanceLog } from "@/lib/types";
 
 export async function GET(request: NextRequest) {
@@ -15,78 +15,78 @@ export async function GET(request: NextRequest) {
     const action = searchParams.get("action"); // in or out
     const personId = searchParams.get("personId");
 
-    // Build query parts
-    // Note: PostgreSQL table names are case-sensitive when quoted
-    // We use unquoted names which are case-insensitive and converted to lowercase
-    let queryText = `
-      SELECT 
-        a.id,
-        a.person_id,
-        a.action,
-        a.status,
-        a.attendance_date as timestamp,
-        p.nom || ' ' || p.prenom as person_name,
-        p.type as person_type,
-        p.rfid_uuid
-      FROM attendance a
-      JOIN persons p ON a.person_id = p.id
-      WHERE 1=1
-    `;
-    const params: any[] = [];
-    let paramIndex = 1;
+    const where: any = {};
 
     if (startDate && endDate) {
-      queryText += ` AND DATE(a.attendance_date) BETWEEN $${paramIndex} AND $${
-        paramIndex + 1
-      }`;
-      params.push(startDate, endDate);
-      paramIndex += 2;
+      where.attendance_date = {
+        gte: new Date(startDate),
+        lte: new Date(endDate + "T23:59:59"),
+      };
     } else if (startDate) {
-      queryText += ` AND DATE(a.attendance_date) >= $${paramIndex}`;
-      params.push(startDate);
-      paramIndex++;
+      where.attendance_date = {
+        gte: new Date(startDate),
+      };
     } else if (endDate) {
-      queryText += ` AND DATE(a.attendance_date) <= $${paramIndex}`;
-      params.push(endDate);
-      paramIndex++;
+      where.attendance_date = {
+        lte: new Date(endDate + "T23:59:59"),
+      };
     } else if (date) {
-      queryText += ` AND DATE(a.attendance_date) = $${paramIndex}`;
-      params.push(date);
-      paramIndex++;
+      const dateStart = new Date(date);
+      const dateEnd = new Date(date);
+      dateEnd.setHours(23, 59, 59, 999);
+      where.attendance_date = {
+        gte: dateStart,
+        lte: dateEnd,
+      };
     }
 
     if (status && (status === "success" || status === "failed")) {
-      queryText += ` AND a.status = $${paramIndex}`;
-      params.push(status);
-      paramIndex++;
+      where.status = status;
     }
 
     if (action && (action === "in" || action === "out")) {
-      queryText += ` AND a.action = $${paramIndex}`;
-      params.push(action);
-      paramIndex++;
+      where.action = action;
     }
 
     if (personId) {
       const parsedPersonId = parseInt(personId, 10);
       if (!Number.isNaN(parsedPersonId)) {
-        queryText += ` AND a.person_id = $${paramIndex}`;
-        params.push(parsedPersonId);
-        paramIndex++;
+        where.person_id = parsedPersonId;
       }
     }
 
-    queryText += ` ORDER BY a.attendance_date DESC LIMIT $${paramIndex} OFFSET $${
-      paramIndex + 1
-    }`;
-    params.push(limit, offset);
+    const logs = await prisma.attendance.findMany({
+      where,
+      include: {
+        person: {
+          select: {
+            nom: true,
+            prenom: true,
+            type: true,
+            rfid_uuid: true,
+          },
+        },
+      },
+      orderBy: {
+        attendance_date: "desc",
+      },
+      take: limit,
+      skip: offset,
+    });
 
-    const { dbQuery } = await import("@/lib/db");
-    const result = await dbQuery(queryText, params);
-    const logs = result.rows as AttendanceLog[];
+    const formattedLogs: AttendanceLog[] = logs.map((log) => ({
+      id: log.id,
+      person_id: log.person_id,
+      action: log.action,
+      status: log.status,
+      timestamp: log.attendance_date.toISOString(),
+      person_name: `${log.person.nom} ${log.person.prenom}`,
+      person_type: log.person.type,
+      rfid_uuid: log.person.rfid_uuid,
+    }));
 
-    console.log(`📋 ${logs.length} attendance records retrieved`);
-    return NextResponse.json(logs);
+    console.log(`📋 ${formattedLogs.length} attendance records retrieved`);
+    return NextResponse.json(formattedLogs);
   } catch (error) {
     console.error("❌ Error while retrieving attendance logs:", error);
     return NextResponse.json(

@@ -1,0 +1,86 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Person {
+  id         Int      @id @default(autoincrement())
+  rfid_uuid  String   @unique
+  type       PersonType
+  nom        String
+  prenom     String
+  photo_path String   @unique
+  created_at DateTime @default(now())
+  updated_at DateTime @updatedAt
+
+  attendance      Attendance[]
+  student_payments StudentPayment[]
+
+  @@map("persons")
+}
+
+model Attendance {
+  id             Int            @id @default(autoincrement())
+  person_id      Int
+  action         AttendanceAction
+  status         AttendanceStatus
+  attendance_date DateTime       @default(now())
+
+  person Person @relation(fields: [person_id], references: [id])
+
+  @@map("attendance")
+}
+
+model Payment {
+  id            Int            @id @default(autoincrement())
+  amount        Float
+  payment_method PaymentMethod
+  payment_date  DateTime       @default(now())
+
+  student_payments StudentPayment[]
+
+  @@map("payments")
+}
+
+model StudentPayment {
+  id         Int      @id @default(autoincrement())
+  student_id Int
+  payment_id Int
+  trimester  Int
+
+  student Person  @relation(fields: [student_id], references: [id], onDelete: Cascade)
+  payment Payment @relation(fields: [payment_id], references: [id])
+
+  @@map("student_payments")
+}
+
+enum PersonType {
+  student
+  teacher
+  staff
+  visitor
+}
+
+enum AttendanceAction {
+  in
+  out
+}
+
+enum AttendanceStatus {
+  success
+  failed
+}
+
+enum PaymentMethod {
+  cash
+  card
+  bank_transfer
+}
+

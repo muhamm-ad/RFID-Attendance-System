@@ -43,7 +43,7 @@ A comprehensive attendance management and access control system based on RFID te
 ## Technologies Used
 
 - **Framework**: [Next.js 16](https://nextjs.org/) (React 19)
-- **Database**: [PostgreSQL](https://www.postgresql.org/) with [@vercel/postgres](https://vercel.com/docs/storage/vercel-postgres)
+- **Database**: [PostgreSQL](https://www.postgresql.org/) with [Prisma](https://www.prisma.io/)
 - **Styling**: [Tailwind CSS 4](https://tailwindcss.com/)
 - **Icons**: [Lucide React](https://lucide.dev/)
 - **Language**: [TypeScript](https://www.typescriptlang.org/)
@@ -53,7 +53,8 @@ A comprehensive attendance management and access control system based on RFID te
 
 - **Node.js**: Version 18 or higher
 - **npm** or **yarn**: Package manager
-- **PostgreSQL Database**: Vercel Postgres (recommended for Vercel deployment) or any PostgreSQL database
+- **PostgreSQL**: Database server (can be local or remote)
+- **Prisma**: ORM for database management
 
 ## Installation
 
@@ -70,36 +71,53 @@ cd rfid-attendance
 npm install
 ```
 
-3. **Configure the database**
+3. **Set up environment variables**
+Create a `.env` file in the root directory:
 
-   **Important**: You need to set up the correct environment variables for PostgreSQL.
+```bash
+DATABASE_URL="postgresql://user:password@localhost:5432/rfid_attendance"
+```
 
-   For local development, create a `.env.local` file:
+4. **Set up the database**
 
-   ```bash
-   # .env.local
-   # For @vercel/postgres (pooled connection - required)
-   POSTGRES_URL="postgresql://user:password@host:port/database?sslmode=require"
-   
-   # Optional: fallback to DATABASE_URL if POSTGRES_URL is not set
-   DATABASE_URL="postgresql://user:password@host:port/database?sslmode=require"
-   ```
+```bash
+# Generate Prisma Client
+npx prisma generate
 
-   **For Vercel deployment:**
-   - Add a Vercel Postgres database in your Vercel project dashboard
-   - The connection variable `POSTGRES_URL` (pooled connection) will be automatically injected
-   - The app uses `createClient()` from `@vercel/postgres` which automatically handles the pooled connection
+# Run migrations
+npx prisma migrate dev --name init
 
-   The database is automatically initialized when the application starts. Test data (seed) is also automatically loaded.
+# Seed the database (optional)
+npx prisma db seed
+```
 
-4. **Run the application in development mode**
+3. **Set up environment variables**
+Create a `.env` file in the root directory:
+
+```bash
+DATABASE_URL="postgresql://user:password@localhost:5432/rfid_attendance"
+```
+
+4. **Set up the database**
+
+```bash
+# Generate Prisma Client
+npx prisma generate
+
+# Run migrations
+npx prisma migrate dev --name init
+
+# Seed the database (optional)
+npx prisma db seed
+```
+
+5. **Run the application in development mode**
 
 ```bash
 npm run dev
 ```
 
-5. **Access the application**
-
+6. **Access the application**
 Open your browser at: [http://localhost:3000](http://localhost:3000)
 
 The application automatically redirects to the dashboard: `/dashboard`
@@ -127,10 +145,13 @@ rfid-attendance/
 │   ├── Reports.tsx       # Reports
 │   ├── StatisticsDashboard.tsx # Statistics dashboard
 │   └── ThemeToggle.tsx   # Light/dark theme toggle
+├── prisma/              # Prisma schema and migrations
+│   ├── schema.prisma    # Database schema
+│   └── seed.ts          # Database seed script
 ├── docs/                 # Documentation
 │   └── API.md           # Complete API documentation
 ├── lib/                  # Libraries and utilities
-│   ├── db.ts            # Database configuration and initialization
+│   ├── db.ts            # Prisma Client configuration
 │   ├── seed.ts          # Test data (seed)
 │   ├── types.ts          # TypeScript types
 │   └── utils.ts         # Utility functions
@@ -142,7 +163,7 @@ rfid-attendance/
 
 ## Database
 
-The system uses PostgreSQL with the following tables:
+The system uses PostgreSQL with Prisma ORM. The database schema is defined in `prisma/schema.prisma`.
 
 ### Main Tables
 
@@ -261,7 +282,7 @@ The system includes automatic test data (seed) that is loaded on first initializ
 - **Attendance data**: November 2024 - January 2025
 - **Payments**: Distributed across 3 trimesters
 
-Seed data is defined in `lib/seed.ts` and is only loaded if the database is empty.
+Seed data is defined in `prisma/seed.ts` and can be loaded using `npx prisma db seed`.
 
 ## User Interface
 

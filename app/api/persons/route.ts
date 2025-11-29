@@ -1,6 +1,6 @@
 // app/api/persons/route.ts
 import { NextRequest, NextResponse } from "next/server";
-import sql from "@/lib/db";
+import prisma from "@/lib/db";
 import { Person, PersonWithPayments } from "@/lib/types";
 import { getPersonWithPayments } from "@/lib/utils";
 
@@ -10,21 +10,18 @@ export async function GET(request: NextRequest) {
     const { searchParams } = new URL(request.url);
     const type = searchParams.get("type"); // Filter by type if provided
 
-    let result;
+    const where: any = {};
     if (type && ["student", "teacher", "staff", "visitor"].includes(type)) {
-      result = await sql`
-        SELECT * FROM persons 
-        WHERE type = ${type}
-        ORDER BY nom, prenom
-      `;
-    } else {
-      result = await sql`
-        SELECT * FROM persons 
-        ORDER BY nom, prenom
-      `;
+      where.type = type;
     }
 
-    const persons = result.rows as Person[];
+    const persons = await prisma.person.findMany({
+      where,
+      orderBy: [
+        { nom: "asc" },
+        { prenom: "asc" },
+      ],
+    });
 
     // For students, add payment info
     const personsWithPayments = await Promise.all(
@@ -32,7 +29,15 @@ export async function GET(request: NextRequest) {
         if (person.type === "student") {
           return await getPersonWithPayments(person.rfid_uuid);
         }
-        return person;
+        // For non-students, convert dates and add payment fields
+        return {
+          ...person,
+          created_at: person.created_at.toISOString(),
+          updated_at: person.updated_at.toISOString(),
+          trimester1_paid: true,
+          trimester2_paid: true,
+          trimester3_paid: true,
+        } as PersonWithPayments;
       })
     );
 
@@ -82,31 +87,34 @@ export async function POST(request: NextRequest) {
     }
 
     // Insert the new person with rfid_uuid
-    const result = await sql`
-      INSERT INTO persons (rfid_uuid, type, nom, prenom, photo_path)
-      VALUES (${rfid_uuid}, ${type}, ${nom}, ${prenom}, ${photo_path})
-      RETURNING *
-    `;
-
-    const newPerson = result.rows[0] as Person;
+    const newPerson = await prisma.person.create({
+      data: {
+        rfid_uuid,
+        type: type as any,
+        nom,
+        prenom,
+        photo_path,
+      },
+    });
 
     console.log(`✅ New person created: ${prenom} ${nom} (${type})`);
-    return NextResponse.json(newPerson, { status: 201 });
+    return NextResponse.json({
+      ...newPerson,
+      created_at: newPerson.created_at.toISOString(),
+      updated_at: newPerson.updated_at.toISOString(),
+    }, { status: 201 });
   } catch (error: any) {
     console.error("❌ Error while creating the person:", error);
 
-    if (
-      error.message &&
-      (error.message.includes("UNIQUE constraint") ||
-        error.message.includes("duplicate key"))
-    ) {
-      if (error.message.includes("rfid_uuid")) {
+    if (error.code === "P2002") {
+      // Prisma unique constraint error
+      if (error.meta?.target?.includes("rfid_uuid")) {
         return NextResponse.json(
           { error: "This RFID UUID is already associated with a person" },
           { status: 409 }
         );
       }
-      if (error.message.includes("photo_path")) {
+      if (error.meta?.target?.includes("photo_path")) {
         return NextResponse.json(
           { error: "This photo path is already used" },
           { status: 409 }
