@@ -2,7 +2,7 @@
 "use client";
 
 import { useEffect, useState, useRef } from "react";
-import { CreditCard, Plus, DollarSign, Calendar, Search, ChevronDown, X } from "lucide-react";
+import { CreditCard, Plus, DollarSign, Calendar, Search, ChevronDown, X, User } from "lucide-react";
 
 type Payment = {
   id: number;
@@ -19,6 +19,7 @@ type Student = {
   nom: string;
   prenom: string;
   rfid_uuid: string;
+  photo_path?: string;
 };
 
 export default function PaymentManagement() {
@@ -470,12 +471,39 @@ export default function PaymentManagement() {
         <div>
           {selectedStudent && (
             <div className="mb-4 p-4 bg-indigo-50 rounded-lg">
-              <h3 className="font-semibold text-gray-800">
-                Payments for: {selectedStudent.prenom} {selectedStudent.nom}
-              </h3>
-              <div className="flex gap-4 mt-2 text-sm text-gray-600">
-                <p>ID: <span className="font-mono font-medium">{selectedStudent.id}</span></p>
-                <p>RFID: <span className="font-mono font-medium">{selectedStudent.rfid_uuid}</span></p>
+              <div className="flex items-center gap-3">
+                {selectedStudent.photo_path && selectedStudent.photo_path.trim() !== "" ? (
+                  <img
+                    src={selectedStudent.photo_path}
+                    alt={`${selectedStudent.prenom} ${selectedStudent.nom}`}
+                    className="w-12 h-12 rounded-full object-cover border-2 border-indigo-200"
+                    onError={(e) => {
+                      // If image fails to load, hide image and show icon
+                      const target = e.target as HTMLImageElement;
+                      target.style.display = "none";
+                      const iconContainer = target.parentElement?.querySelector(".photo-icon-container") as HTMLElement;
+                      if (iconContainer) {
+                        iconContainer.style.display = "flex";
+                      }
+                    }}
+                  />
+                ) : null}
+                <div
+                  className={`w-12 h-12 rounded-full bg-indigo-200 flex items-center justify-center photo-icon-container ${
+                    selectedStudent.photo_path && selectedStudent.photo_path.trim() !== "" ? "hidden" : ""
+                  }`}
+                >
+                  <User size={24} className="text-indigo-600" />
+                </div>
+                <div>
+                  <h3 className="font-semibold text-gray-800">
+                    Payments for: {selectedStudent.prenom} {selectedStudent.nom}
+                  </h3>
+                  <div className="flex gap-4 mt-2 text-sm text-gray-600">
+                    <p>ID: <span className="font-mono font-medium">{selectedStudent.id}</span></p>
+                    <p>RFID: <span className="font-mono font-medium">{selectedStudent.rfid_uuid}</span></p>
+                  </div>
+                </div>
               </div>
             </div>
           )}

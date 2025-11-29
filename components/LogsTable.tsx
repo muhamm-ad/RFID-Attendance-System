@@ -3,7 +3,7 @@
 
 import { useEffect, useMemo, useState, useRef } from "react";
 import { AttendanceLog } from "@/lib/types";
-import { ArrowUpDown, Clock, RefreshCw, LogIn, LogOut, UserCircle2, Search, ChevronDown, X } from "lucide-react";
+import { ArrowUpDown, Clock, RefreshCw, LogIn, LogOut, UserCircle2, Search, ChevronDown, X, User } from "lucide-react";
 
 export default function LogsTable() {
   const [logs, setLogs] = useState<AttendanceLog[]>([]);
@@ -411,7 +411,32 @@ export default function LogsTable() {
                     {new Date(log.timestamp).toLocaleString()}
                   </td>
                   <td className="px-4 py-3 whitespace-nowrap">
-                    <div className="font-medium text-gray-900">{log.person_name}</div>
+                    <div className="flex items-center gap-3">
+                      {log.photo_path && log.photo_path.trim() !== "" ? (
+                        <img
+                          src={log.photo_path}
+                          alt={log.person_name}
+                          className="w-10 h-10 rounded-full object-cover border-2 border-gray-200"
+                          onError={(e) => {
+                            // If image fails to load, hide image and show icon
+                            const target = e.target as HTMLImageElement;
+                            target.style.display = "none";
+                            const iconContainer = target.parentElement?.querySelector(".photo-icon-container") as HTMLElement;
+                            if (iconContainer) {
+                              iconContainer.style.display = "flex";
+                            }
+                          }}
+                        />
+                      ) : null}
+                      <div
+                        className={`w-10 h-10 rounded-full bg-gray-200 flex items-center justify-center photo-icon-container ${
+                          log.photo_path && log.photo_path.trim() !== "" ? "hidden" : ""
+                        }`}
+                      >
+                        <User size={20} className="text-gray-500" />
+                      </div>
+                      <div className="font-medium text-gray-900">{log.person_name}</div>
+                    </div>
                   </td>
                   <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-600 font-mono">
                     {log.person_id}

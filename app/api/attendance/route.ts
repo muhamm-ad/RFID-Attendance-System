@@ -64,6 +64,7 @@ export async function GET(request: NextRequest) {
             prenom: true,
             type: true,
             rfid_uuid: true,
+            photo_path: true,
           },
         },
       },
@@ -83,6 +84,7 @@ export async function GET(request: NextRequest) {
       person_name: `${log.person.nom} ${log.person.prenom}`,
       person_type: log.person.type,
       rfid_uuid: log.person.rfid_uuid,
+      photo_path: log.person.photo_path,
     }));
 
     // console.log(`📋 ${formattedLogs.length} attendance records retrieved`);

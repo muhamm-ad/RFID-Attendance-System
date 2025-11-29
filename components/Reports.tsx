@@ -2,7 +2,7 @@
 "use client";
 
 import { useState } from "react";
-import { FileText, Download, Calendar, TrendingUp, DollarSign, Users } from "lucide-react";
+import { FileText, Download, Calendar, TrendingUp, DollarSign, Users, User } from "lucide-react";
 
 type ReportData = {
   start_date: string;
@@ -242,8 +242,35 @@ export default function Reports() {
                       <tbody className="bg-white divide-y divide-gray-200">
                         {reportData.person_summary.map((person: any) => (
                           <tr key={person.id} className="hover:bg-gray-50">
-                            <td className="px-4 py-3 whitespace-nowrap font-medium">
-                              {person.prenom} {person.nom}
+                            <td className="px-4 py-3 whitespace-nowrap">
+                              <div className="flex items-center gap-3">
+                                {person.photo_path && person.photo_path.trim() !== "" ? (
+                                  <img
+                                    src={person.photo_path}
+                                    alt={`${person.prenom} ${person.nom}`}
+                                    className="w-10 h-10 rounded-full object-cover border-2 border-gray-200"
+                                    onError={(e) => {
+                                      // If image fails to load, hide image and show icon
+                                      const target = e.target as HTMLImageElement;
+                                      target.style.display = "none";
+                                      const iconContainer = target.parentElement?.querySelector(".photo-icon-container") as HTMLElement;
+                                      if (iconContainer) {
+                                        iconContainer.style.display = "flex";
+                                      }
+                                    }}
+                                  />
+                                ) : null}
+                                <div
+                                  className={`w-10 h-10 rounded-full bg-gray-200 flex items-center justify-center photo-icon-container ${
+                                    person.photo_path && person.photo_path.trim() !== "" ? "hidden" : ""
+                                  }`}
+                                >
+                                  <User size={20} className="text-gray-500" />
+                                </div>
+                                <div className="font-medium text-gray-900">
+                                  {person.prenom} {person.nom}
+                                </div>
+                              </div>
                             </td>
                             <td className="px-4 py-3 whitespace-nowrap">
                               <span className="px-2 py-1 text-xs font-medium rounded-full bg-gray-100 text-gray-800 capitalize">
@@ -352,8 +379,35 @@ export default function Reports() {
                       <tbody className="bg-white divide-y divide-gray-200">
                         {reportData.details.map((payment: any, index: number) => (
                           <tr key={index} className="hover:bg-gray-50">
-                            <td className="px-4 py-3 whitespace-nowrap font-medium">
-                              {payment.prenom} {payment.nom}
+                            <td className="px-4 py-3 whitespace-nowrap">
+                              <div className="flex items-center gap-3">
+                                {payment.photo_path && payment.photo_path.trim() !== "" ? (
+                                  <img
+                                    src={payment.photo_path}
+                                    alt={`${payment.prenom} ${payment.nom}`}
+                                    className="w-10 h-10 rounded-full object-cover border-2 border-gray-200"
+                                    onError={(e) => {
+                                      // If image fails to load, hide image and show icon
+                                      const target = e.target as HTMLImageElement;
+                                      target.style.display = "none";
+                                      const iconContainer = target.parentElement?.querySelector(".photo-icon-container") as HTMLElement;
+                                      if (iconContainer) {
+                                        iconContainer.style.display = "flex";
+                                      }
+                                    }}
+                                  />
+                                ) : null}
+                                <div
+                                  className={`w-10 h-10 rounded-full bg-gray-200 flex items-center justify-center photo-icon-container ${
+                                    payment.photo_path && payment.photo_path.trim() !== "" ? "hidden" : ""
+                                  }`}
+                                >
+                                  <User size={20} className="text-gray-500" />
+                                </div>
+                                <div className="font-medium text-gray-900">
+                                  {payment.prenom} {payment.nom}
+                                </div>
+                              </div>
                             </td>
                             <td className="px-4 py-3 whitespace-nowrap">
                               <span className="px-2 py-1 text-xs font-medium rounded-full bg-indigo-100 text-indigo-800">

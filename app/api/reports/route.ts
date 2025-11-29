@@ -102,6 +102,7 @@ export async function GET(request: NextRequest) {
               nom: person?.nom,
               prenom: person?.prenom,
               type: person?.type,
+              photo_path: person?.photo_path,
               total_scans: stat._count.id,
               successful_scans: successful,
               entries: entries,
@@ -177,6 +178,7 @@ export async function GET(request: NextRequest) {
           payment.student_payments.map((sp) => ({
             nom: sp.student.nom,
             prenom: sp.student.prenom,
+            photo_path: sp.student.photo_path,
             trimester: sp.trimester,
             amount: payment.amount,
             payment_method: payment.payment_method,

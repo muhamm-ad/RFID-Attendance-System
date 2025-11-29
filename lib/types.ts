@@ -59,4 +59,5 @@ export interface AttendanceLog {
   person_name: string;
   person_type: string;
   rfid_uuid: string;
+  photo_path?: string;
 }
