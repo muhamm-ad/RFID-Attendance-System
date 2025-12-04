@@ -1,7 +1,6 @@
 // app/api/attendance/route.ts
 import { NextRequest, NextResponse } from "next/server";
-import prisma from "@/lib/db";
-import { AttendanceLog } from "@/lib/types";
+import { prisma, type AttendanceLog } from "@/lib/db";
 
 export async function GET(request: NextRequest) {
   try {
@@ -14,6 +13,8 @@ export async function GET(request: NextRequest) {
     const status = searchParams.get("status"); // success or failed
     const action = searchParams.get("action"); // in or out
     const personId = searchParams.get("personId");
+    const level = searchParams.get("level"); // License_1, License_2, etc.
+    const classFilter = searchParams.get("class"); // Class name
 
     const where: any = {};
 
@@ -55,6 +56,16 @@ export async function GET(request: NextRequest) {
       }
     }
 
+    if (level || classFilter) {
+      where.person = {};
+      if (level) {
+        where.person.level = level;
+      }
+      if (classFilter) {
+        where.person.class = { contains: classFilter, mode: "insensitive" };
+      }
+    }
+
     const logs = await prisma.attendance.findMany({
       where,
       include: {
@@ -65,6 +76,8 @@ export async function GET(request: NextRequest) {
             type: true,
             rfid_uuid: true,
             photo_path: true,
+            level: true,
+            class: true,
           },
         },
       },
@@ -85,10 +98,13 @@ export async function GET(request: NextRequest) {
       person_type: log.person.type,
       rfid_uuid: log.person.rfid_uuid,
       photo_path: log.person.photo_path,
+      level: log.person.level,
+      class: log.person.class,
     }));
 
     // console.log(`📋 ${formattedLogs.length} attendance records retrieved`);
     return NextResponse.json(formattedLogs);
+    
   } catch (error) {
     console.error("❌ Error while retrieving attendance logs:", error);
     return NextResponse.json(

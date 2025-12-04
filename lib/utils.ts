@@ -1,6 +1,7 @@
 // lib/utils.ts
+// Server-side utilities for API routes
 import prisma from "./db";
-import { PersonWithPayments, Person } from "./types";
+import { PersonWithPayments } from "./db";
 
 /**
  * Determines the current trimester based on the month
@@ -49,11 +50,12 @@ export async function getPersonWithPayments(
 
   // If the person is a student, retrieve their payment info
   if (person.type === "student") {
-    const [trimester1_paid, trimester2_paid, trimester3_paid] = await Promise.all([
-      hasStudentPaid(person.id, 1),
-      hasStudentPaid(person.id, 2),
-      hasStudentPaid(person.id, 3),
-    ]);
+    const [trimester1_paid, trimester2_paid, trimester3_paid] =
+      await Promise.all([
+        hasStudentPaid(person.id, 1),
+        hasStudentPaid(person.id, 2),
+        hasStudentPaid(person.id, 3),
+      ]);
 
     return {
       ...person,

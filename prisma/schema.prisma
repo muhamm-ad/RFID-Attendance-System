@@ -7,31 +7,32 @@ generator client {
 
 datasource db {
   provider = "postgresql"
-  url      = env("DATABASE_URL")
 }
 
 model Person {
-  id         Int      @id @default(autoincrement())
-  rfid_uuid  String   @unique
+  id         Int           @id @default(autoincrement())
+  rfid_uuid  String        @unique
   type       PersonType
   nom        String
   prenom     String
-  photo_path String   @unique
-  created_at DateTime @default(now())
-  updated_at DateTime @updatedAt
+  photo_path String        @unique
+  level      StudentLevel?
+  class      String?
+  created_at DateTime      @default(now())
+  updated_at DateTime      @updatedAt
 
-  attendance      Attendance[]
+  attendance       Attendance[]
   student_payments StudentPayment[]
 
   @@map("persons")
 }
 
 model Attendance {
-  id             Int            @id @default(autoincrement())
-  person_id      Int
-  action         AttendanceAction
-  status         AttendanceStatus
-  attendance_date DateTime       @default(now())
+  id              Int              @id @default(autoincrement())
+  person_id       Int
+  action          AttendanceAction
+  status          AttendanceStatus
+  attendance_date DateTime         @default(now())
 
   person Person @relation(fields: [person_id], references: [id])
 
@@ -39,10 +40,10 @@ model Attendance {
 }
 
 model Payment {
-  id            Int            @id @default(autoincrement())
-  amount        Float
+  id             Int           @id @default(autoincrement())
+  amount         Float
   payment_method PaymentMethod
-  payment_date  DateTime       @default(now())
+  payment_date   DateTime      @default(now())
 
   student_payments StudentPayment[]
 
@@ -50,7 +51,7 @@ model Payment {
 }
 
 model StudentPayment {
-  id         Int      @id @default(autoincrement())
+  id         Int @id @default(autoincrement())
   student_id Int
   payment_id Int
   trimester  Int
@@ -84,3 +85,10 @@ enum PaymentMethod {
   bank_transfer
 }
 
+enum StudentLevel {
+  License_1
+  License_2
+  License_3
+  Master_1
+  Master_2
+}

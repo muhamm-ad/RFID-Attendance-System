@@ -49,6 +49,8 @@ Scans an RFID badge and verifies access based on person type and payment status.
     "nom": "Diallo",
     "prenom": "Amadou",
     "photo_path": "/photos/amadou_diallo.jpg",
+    "level": "License_1",
+    "class": "L1-A",
     "trimester1_paid": true,
     "trimester2_paid": true,
     "trimester3_paid": false
@@ -101,6 +103,8 @@ Scans an RFID badge and verifies access based on person type and payment status.
     "nom": "Diallo",
     "prenom": "Amadou",
     "photo_path": "/photos/amadou_diallo.jpg",
+    "level": "License_1",
+    "class": "L1-A",
     "trimester1_paid": false,
     "trimester2_paid": false,
     "trimester3_paid": false
@@ -157,6 +161,8 @@ GET /api/persons?type=student
     "nom": "Diallo",
     "prenom": "Amadou",
     "photo_path": "/photos/amadou_diallo.jpg",
+    "level": "License_1",
+    "class": "L1-A",
     "trimester1_paid": true,
     "trimester2_paid": true,
     "trimester3_paid": false
@@ -167,7 +173,9 @@ GET /api/persons?type=student
     "type": "teacher",
     "nom": "Sarr",
     "prenom": "Fatou",
-    "photo_path": "/photos/fatou_sarr.jpg"
+    "photo_path": "/photos/fatou_sarr.jpg",
+    "level": null,
+    "class": "Mathématiques"
   }
 ]
 ```
@@ -199,6 +207,8 @@ Creates a new person in the system.
 - `nom` (string, required): Last name
 - `prenom` (string, required): First name
 - `photo_path` (string, required): Path to the photo
+- `level` (string, optional): Student level - only for students (`License_1`, `License_2`, `License_3`, `Master_1`, `Master_2`)
+- `class` (string, optional): Class name (e.g., "L1-A", "M1-B", "Mathématiques")
 
 **Request Example:**
 
@@ -208,7 +218,9 @@ Creates a new person in the system.
   "type": "student",
   "nom": "Sarr",
   "prenom": "Moussa",
-  "photo_path": "/photos/moussa_sarr.jpg"
+  "photo_path": "/photos/moussa_sarr.jpg",
+  "level": "License_1",
+  "class": "L1-A"
 }
 ```
 
@@ -222,6 +234,8 @@ Creates a new person in the system.
   "nom": "Sarr",
   "prenom": "Moussa",
   "photo_path": "/photos/moussa_sarr.jpg",
+  "level": "License_1",
+  "class": "L1-A",
   "created_at": "2025-11-15T10:30:00.000Z",
   "updated_at": "2025-11-15T10:30:00.000Z"
 }
@@ -240,6 +254,22 @@ Creates a new person in the system.
 ```json
 {
   "error": "Invalid type. Allowed values: student, teacher, staff, visitor"
+}
+```
+
+**Response Error (400) - Level for non-student:**
+
+```json
+{
+  "error": "Level can only be set for students"
+}
+```
+
+**Response Error (400) - Invalid level:**
+
+```json
+{
+  "error": "Invalid level. Allowed values: License_1, License_2, License_3, Master_1, Master_2"
 }
 ```
 
@@ -298,6 +328,8 @@ GET /api/persons/1
   "nom": "Diallo",
   "prenom": "Amadou",
   "photo_path": "/photos/amadou_diallo.jpg",
+  "level": "License_1",
+  "class": "L1-A",
   "trimester1_paid": true,
   "trimester2_paid": true,
   "trimester3_paid": false
@@ -314,6 +346,8 @@ GET /api/persons/1
   "nom": "Sarr",
   "prenom": "Fatou",
   "photo_path": "/photos/fatou_sarr.jpg",
+  "level": null,
+  "class": "Mathématiques",
   "created_at": "2025-11-15T10:30:00.000Z",
   "updated_at": "2025-11-15T10:30:00.000Z"
 }
@@ -366,6 +400,8 @@ Updates information for an existing person.
 - `nom` (string, optional): Last name
 - `prenom` (string, optional): First name
 - `photo_path` (string, optional): Path to the photo
+- `level` (string, optional): Student level - only for students (`License_1`, `License_2`, `License_3`, `Master_1`, `Master_2`, or `null` to remove)
+- `class` (string, optional): Class name (e.g., "L1-A", "M1-B", "Mathématiques", or `null` to remove)
 
 **Request Example - Update badge only:**
 
@@ -383,7 +419,9 @@ Updates information for an existing person.
   "type": "student",
   "nom": "Diallo",
   "prenom": "Amadou",
-  "photo_path": "/photos/amadou_diallo_updated.jpg"
+  "photo_path": "/photos/amadou_diallo_updated.jpg",
+  "level": "License_2",
+  "class": "L2-B"
 }
 ```
 
@@ -397,6 +435,8 @@ Updates information for an existing person.
   "nom": "Diallo",
   "prenom": "Amadou",
   "photo_path": "/photos/amadou_diallo_updated.jpg",
+  "level": "License_2",
+  "class": "L2-B",
   "created_at": "2025-11-15T10:30:00.000Z",
   "updated_at": "2025-11-15T11:00:00.000Z"
 }
@@ -439,6 +479,22 @@ Updates information for an existing person.
 ```json
 {
   "error": "This photo path is already used"
+}
+```
+
+**Response Error (400) - Level for non-student:**
+
+```json
+{
+  "error": "Level can only be set for students"
+}
+```
+
+**Response Error (400) - Invalid level:**
+
+```json
+{
+  "error": "Invalid level. Allowed values: License_1, License_2, License_3, Master_1, Master_2"
 }
 ```
 
@@ -514,8 +570,13 @@ Retrieves attendance logs (access attempt log).
 - `limit` (integer, optional): Maximum number of results. Default: `100`
 - `offset` (integer, optional): Offset for pagination. Default: `0`
 - `date` (string, optional): Filter by date (format: `YYYY-MM-DD`)
+- `startDate` (string, optional): Filter by start date (format: `YYYY-MM-DD`)
+- `endDate` (string, optional): Filter by end date (format: `YYYY-MM-DD`)
 - `status` (string, optional): Filter by status (`success` or `failed`)
 - `action` (string, optional): Filter by action (`in` or `out`)
+- `personId` (integer, optional): Filter by specific person ID
+- `level` (string, optional): Filter by student level (`License_1`, `License_2`, `License_3`, `Master_1`, `Master_2`)
+- `class` (string, optional): Filter by class name (case-insensitive partial match)
 
 **Request Example:**
 
@@ -523,6 +584,8 @@ Retrieves attendance logs (access attempt log).
 GET /api/attendance
 GET /api/attendance?date=2025-11-15&status=success&limit=50
 GET /api/attendance?action=in&offset=0&limit=20
+GET /api/attendance?level=License_1&class=L1-A
+GET /api/attendance?startDate=2025-11-01&endDate=2025-11-15&level=Master_1
 ```
 
 **Response Success (200):**
@@ -866,7 +929,11 @@ GET /api/search?q=Amadou&type=student
     "nom": "Diallo",
     "prenom": "Amadou",
     "photo_path": "/photos/amadou_diallo.jpg",
-    "badge_uuid": "A1B2C3D4"
+    "level": "License_1",
+    "class": "L1-A",
+    "trimester1_paid": true,
+    "trimester2_paid": true,
+    "trimester3_paid": false
   }
 ]
 ```
@@ -1046,6 +1113,16 @@ The system uses an academic calendar with 3 trimesters:
 - `teacher`: Teacher (access always authorized)
 - `staff`: Administrative staff (access always authorized)
 - `visitor`: Visitor (access always authorized)
+
+### Student Levels
+
+- `License_1`: License Year 1
+- `License_2`: License Year 2
+- `License_3`: License Year 3
+- `Master_1`: Master Year 1
+- `Master_2`: Master Year 2
+
+**Note:** The `level` field is only applicable to students and can be `null` for other person types or if not set.
 
 ### Payment Methods
 
