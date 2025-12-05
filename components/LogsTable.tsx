@@ -1,8 +1,8 @@
 // components/LogsTable.tsx
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
-import { AttendanceLog } from "@/lib/db";
+import { useEffect, useMemo, useState, useCallback } from "react";
+import { AttendanceLog, PersonWithPayments } from "@/lib/db";
 import {
   Clock,
   RefreshCw,
@@ -28,80 +28,17 @@ export default function LogsTable() {
     class: "",
     limit: 100,
   });
-  const [personQuery, setPersonQuery] = useState("");
-  const [persons, setPersons] = useState<
-    Array<{
-      id: number;
-      nom: string;
-      prenom: string;
-      rfid_uuid: string;
-      level?: string | null;
-      class?: string | null;
-    }>
-  >([]);
+  const [persons, setPersons] = useState<PersonWithPayments[]>([]);
   const [uniqueLevels, setUniqueLevels] = useState<string[]>([]);
   const [uniqueClasses, setUniqueClasses] = useState<string[]>([]);
   const [personSearchTerm, setPersonSearchTerm] = useState("");
   const [selectedPersonId, setSelectedPersonId] = useState<number | null>(null);
-  type SortKey =
-    | "timestamp"
-    | "person_name"
-    | "person_id"
-    | "person_type"
-    | "level"
-    | "class"
-    | "action"
-    | "status"
-    | "rfid_uuid";
 
   useEffect(() => {
     loadPersons();
   }, []);
 
-  useEffect(() => {
-    loadLogs();
-  }, [
-    filters.startDate,
-    filters.endDate,
-    filters.status,
-    filters.action,
-    filters.level,
-    filters.class,
-    filters.limit,
-    selectedPersonId,
-  ]);
-
-  async function loadPersons() {
-    try {
-      const res = await fetch("/api/persons");
-      const data = await res.json();
-      if (res.ok) {
-        const personsData = data.map((p: any) => ({
-          id: p.id,
-          nom: p.nom,
-          prenom: p.prenom,
-          rfid_uuid: p.rfid_uuid,
-          level: p.level,
-          class: p.class,
-        }));
-        setPersons(personsData);
-
-        // Extract unique levels and classes
-        const levels = new Set<string>();
-        const classes = new Set<string>();
-        personsData.forEach((p: any) => {
-          if (p.level) levels.add(p.level);
-          if (p.class) classes.add(p.class);
-        });
-        setUniqueLevels(Array.from(levels).sort());
-        setUniqueClasses(Array.from(classes).sort());
-      }
-    } catch (e) {
-      console.error("Failed to load persons", e);
-    }
-  }
-
-  async function loadLogs() {
+  const loadLogs = useCallback(async () => {
     setLoading(true);
     setError(null);
     try {
@@ -126,12 +63,50 @@ export default function LogsTable() {
     } finally {
       setLoading(false);
     }
+  }, [
+    filters.startDate,
+    filters.endDate,
+    filters.status,
+    filters.action,
+    filters.level,
+    filters.class,
+    filters.limit,
+    selectedPersonId,
+  ]);
+
+  useEffect(() => {
+    loadLogs();
+  }, [loadLogs]);
+
+  async function loadPersons() {
+    try {
+      const res = await fetch("/api/persons");
+      const data = await res.json();
+      if (res.ok) {
+        setPersons(data);
+
+        // Extract unique levels and classes
+        const levels = new Set<string>();
+        const classes = new Set<string>();
+        data.forEach((p: PersonWithPayments) => {
+          if (p.level) levels.add(p.level);
+          if (p.class) classes.add(p.class);
+        });
+        setUniqueLevels(Array.from(levels).sort());
+        setUniqueClasses(Array.from(classes).sort());
+      }
+    } catch (e) {
+      console.error("Failed to load persons", e);
+    }
   }
 
-  const actionIcons = {
-    in: <LogIn size={16} className="text-blue-600" />,
-    out: <LogOut size={16} className="text-purple-600" />,
-  };
+  const actionIcons = useMemo(
+    () => ({
+      in: <LogIn size={16} className="text-blue-600" />,
+      out: <LogOut size={16} className="text-purple-600" />,
+    }),
+    []
+  );
 
   const getSortValue = (log: AttendanceLog, key: string): any => {
     switch (key) {
@@ -421,7 +396,7 @@ export default function LogsTable() {
               ),
             },
           ],
-          []
+          [actionIcons]
         )}
         loading={loading}
         emptyMessage="No records found"

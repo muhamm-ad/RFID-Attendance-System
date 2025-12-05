@@ -1,24 +1,15 @@
 // components/PersonSearchDropdown.tsx
 "use client";
 
-import React, { useRef, useState, useEffect } from "react";
-import { Search, ChevronDown, X, User } from "lucide-react";
+import React, { useRef, useState } from "react";
+import { Search, ChevronDown, X } from "lucide-react";
 import { useClickOutside } from "@/hooks/useClickOutside";
 import { filterPersons } from "@/lib/ui-utils";
 import PersonAvatar from "./PersonAvatar";
-
-interface Person {
-  id: number;
-  nom: string;
-  prenom: string;
-  rfid_uuid: string;
-  photo_path?: string | null;
-  level?: string | null;
-  class?: string | null;
-}
+import { PersonWithPayments } from "@/lib/db";
 
 interface PersonSearchDropdownProps {
-  persons: Person[];
+  persons: PersonWithPayments[];
   selectedPersonId: number | null;
   searchTerm: string;
   onSearchChange: (value: string) => void;
@@ -46,7 +37,10 @@ export default function PersonSearchDropdown({
 
   useClickOutside(dropdownRef, () => setIsOpen(false), isOpen);
 
-  const filteredPersons = filterPersons(persons, searchTerm);
+  const filteredPersons = filterPersons(
+    persons as Array<PersonWithPayments & { nom: string; prenom: string; id: number; rfid_uuid: string }>,
+    searchTerm
+  );
 
   const handleInputChange = (value: string) => {
     onSearchChange(value);

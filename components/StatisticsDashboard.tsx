@@ -1,7 +1,7 @@
 // components/StatisticsDashboard.tsx
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import {
   Users,
   CheckCircle,
@@ -80,11 +80,7 @@ export default function StatisticsDashboard() {
   const [startDate, setStartDate] = useState(today);
   const [endDate, setEndDate] = useState(today);
 
-  useEffect(() => {
-    loadStats();
-  }, [startDate, endDate]);
-
-  async function loadStats() {
+  const loadStats = useCallback(async () => {
     setLoading(true);
     setError(null);
     try {
@@ -101,7 +97,11 @@ export default function StatisticsDashboard() {
     } finally {
       setLoading(false);
     }
-  }
+  }, [startDate, endDate]);
+
+  useEffect(() => {
+    loadStats();
+  }, [loadStats]);
 
   if (loading && !stats) {
     return (
@@ -688,24 +688,6 @@ function TrendChart({ data }: { data: TrendPoint[] }) {
         return `${index === 0 ? "M" : "L"}${x},${y}`;
       })
       .join(" ");
-  };
-
-  const buildAreaPath = (key: keyof TrendPoint) => {
-    if (data.length === 0) return "";
-    const firstX = padding.left;
-    const lastX = padding.left + (data.length - 1) * stepX;
-    const baseY = padding.top + innerHeight;
-    
-    const path = data
-      .map((point, index) => {
-        const value = Number(point[key]) || 0;
-        const x = padding.left + index * stepX;
-        const y = padding.top + innerHeight - (value / maxValue) * innerHeight;
-        return `${x},${y}`;
-      })
-      .join(" ");
-    
-    return `M${firstX},${baseY} L${path} L${lastX},${baseY} Z`;
   };
 
   const formatLabel = (isoDate: string) => {

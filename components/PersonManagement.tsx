@@ -1,7 +1,7 @@
 // components/PersonManagement.tsx
 "use client";
 
-import { useEffect, useState, useMemo } from "react";
+import { useEffect, useState, useMemo, useCallback } from "react";
 import { PersonWithPayments } from "@/lib/db";
 import {
   Users,
@@ -13,7 +13,7 @@ import {
 import DataTable, { Column } from "./DataTable";
 import PersonSearchDropdown from "./PersonSearchDropdown";
 import PersonAvatar from "./PersonAvatar";
-import { useClickOutside } from "@/hooks/useClickOutside";
+// import { useClickOutside } from "@/hooks/useClickOutside";
 import {
   typeColors,
   BadgeGray,
@@ -23,8 +23,8 @@ import {
   selectClasses,
   buttonPrimaryClasses,
   buttonSecondaryClasses,
-  filterPersons,
 } from "@/lib/ui-utils";
+import Image from "next/image";
 
 export default function PersonManagement() {
   const [persons, setPersons] = useState<PersonWithPayments[]>([]);
@@ -57,25 +57,7 @@ export default function PersonManagement() {
   const [photoPreview, setPhotoPreview] = useState<string | null>(null);
   const [uploadingPhoto, setUploadingPhoto] = useState(false);
 
-  useEffect(() => {
-    loadPersons();
-  }, [typeFilter]);
-
-  // Auto-search when typing (debounced)
-  useEffect(() => {
-    if (searchTerm.length >= 2 && !selectedPersonId) {
-      const timeoutId = setTimeout(() => {
-        handleSearch();
-      }, 500);
-      return () => clearTimeout(timeoutId);
-    } else if (searchTerm.length === 0 && !selectedPersonId) {
-      loadPersons();
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [searchTerm, selectedPersonId]);
-
-
-  async function loadPersons() {
+  const loadPersons = useCallback(async () => {
     setLoading(true);
     setError(null);
     try {
@@ -93,7 +75,24 @@ export default function PersonManagement() {
     } finally {
       setLoading(false);
     }
-  }
+  }, [typeFilter]);
+
+  useEffect(() => {
+    loadPersons();
+  }, [loadPersons]);
+
+  // Auto-search when typing (debounced)
+  useEffect(() => {
+    if (searchTerm.length >= 2 && !selectedPersonId) {
+      const timeoutId = setTimeout(() => {
+        handleSearch();
+      }, 500);
+      return () => clearTimeout(timeoutId);
+    } else if (searchTerm.length === 0 && !selectedPersonId) {
+      loadPersons();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchTerm, selectedPersonId]);
 
   async function handleSearch() {
     if (searchTerm.length < 2 && !selectedPersonId) {
@@ -267,7 +266,7 @@ export default function PersonManagement() {
     }
   }
 
-  async function handleDelete(id: number) {
+  const handleDelete = useCallback(async (id: number) => {
     if (!confirm("Are you sure you want to delete this person?")) return;
     setError(null);
     try {
@@ -278,7 +277,7 @@ export default function PersonManagement() {
     } catch (e: any) {
       setError(e.message || "Unexpected error");
     }
-  }
+  }, [loadPersons]);
 
   function startEdit(person: PersonWithPayments) {
     setEditingPerson(person);
@@ -525,7 +524,7 @@ export default function PersonManagement() {
                 </label>
                 {photoPreview && (
                   <div className="mb-2">
-                    <img
+                    <Image
                       src={photoPreview}
                       alt="Preview"
                       className="w-24 h-24 object-cover rounded-lg border border-gray-300"
@@ -734,7 +733,7 @@ export default function PersonManagement() {
               ),
             },
           ],
-          []
+          [handleDelete]
         )}
         loading={loading}
         emptyMessage="No persons found"

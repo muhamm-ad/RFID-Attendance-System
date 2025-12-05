@@ -2,6 +2,7 @@
 "use client";
 
 import { User } from "lucide-react";
+import Image from "next/image";
 
 interface PersonAvatarProps {
   photoPath?: string | null;
@@ -33,7 +34,7 @@ export default function PersonAvatar({
   return (
     <>
       {hasPhoto ? (
-        <img
+        <Image
           src={photoPath}
           alt={name}
           className={`${sizeClasses[size]} rounded-full object-cover border-2 border-gray-200 ${className}`}

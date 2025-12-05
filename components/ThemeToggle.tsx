@@ -12,17 +12,21 @@ declare global {
 }
 
 export default function ThemeToggle() {
-  const [theme, setTheme] = useState<Theme>("light");
+  const [theme, setTheme] = useState<Theme>(() => {
+    if (typeof window !== "undefined") {
+      const root = document.documentElement;
+      return (root.dataset.theme as Theme) || "light";
+    }
+    return "light";
+  });
 
   useEffect(() => {
-    const root = document.documentElement;
-    setTheme((root.dataset.theme as Theme) || "light");
-
     const handleThemeChange = (event: Event) => {
       const detail = (event as CustomEvent<Theme>).detail;
       if (detail) {
         setTheme(detail);
       } else {
+        const root = document.documentElement;
         setTheme((root.dataset.theme as Theme) || "light");
       }
     };

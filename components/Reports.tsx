@@ -3,6 +3,7 @@
 
 import { useState } from "react";
 import { FileText, Download, Calendar, TrendingUp, DollarSign, Users, User } from "lucide-react";
+import Image from "next/image";
 
 type ReportData = {
   start_date: string;
@@ -245,7 +246,7 @@ export default function Reports() {
                             <td className="px-4 py-3 whitespace-nowrap">
                               <div className="flex items-center gap-3">
                                 {person.photo_path && person.photo_path.trim() !== "" ? (
-                                  <img
+                                  <Image
                                     src={person.photo_path}
                                     alt={`${person.prenom} ${person.nom}`}
                                     className="w-10 h-10 rounded-full object-cover border-2 border-gray-200"
@@ -382,7 +383,7 @@ export default function Reports() {
                             <td className="px-4 py-3 whitespace-nowrap">
                               <div className="flex items-center gap-3">
                                 {payment.photo_path && payment.photo_path.trim() !== "" ? (
-                                  <img
+                                  <Image
                                     src={payment.photo_path}
                                     alt={`${payment.prenom} ${payment.nom}`}
                                     className="w-10 h-10 rounded-full object-cover border-2 border-gray-200"
