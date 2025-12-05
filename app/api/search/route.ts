@@ -1,7 +1,6 @@
 // app/api/search/route.ts
 import { NextRequest, NextResponse } from "next/server";
-import prisma from "@/lib/db";
-import { Person, PersonWithPayments } from "@/lib/types";
+import { prisma, PersonWithPayments } from "@/lib/db";
 import { getPersonWithPayments } from "@/lib/utils";
 
 export async function GET(request: NextRequest) {

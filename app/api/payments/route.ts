@@ -1,7 +1,6 @@
 // app/api/payments/route.ts
 import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/db";
-import { Payment, StudentPayment } from "@/lib/types";
 
 // POST: Register a payment for a student
 export async function POST(request: NextRequest) {

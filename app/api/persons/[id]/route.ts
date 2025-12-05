@@ -1,7 +1,6 @@
 // app/api/persons/[id]/route.ts
 import { NextRequest, NextResponse } from "next/server";
-import prisma from "@/lib/db";
-import { Person } from "@/lib/types";
+import { prisma } from "@/lib/db";
 import { getPersonWithPayments } from "@/lib/utils";
 
 // GET: Retrieve a person by ID
@@ -56,7 +55,15 @@ export async function PUT(
       return NextResponse.json({ error: "Invalid ID" }, { status: 400 });
     }
 
-    const { rfid_uuid, type, nom, prenom, photo_path } = body;
+    const {
+      rfid_uuid,
+      type,
+      nom,
+      prenom,
+      photo_path,
+      level,
+      class: classField,
+    } = body;
 
     // Check that the person exists
     const existing = await prisma.person.findUnique({
@@ -66,6 +73,38 @@ export async function PUT(
       return NextResponse.json({ error: "Person not found" }, { status: 404 });
     }
 
+    // Validate level if provided (only for students)
+    if (level !== undefined) {
+      // Determine the final person type (updated type if provided, otherwise existing type)
+      const finalType = type !== undefined ? type : existing.type;
+      
+      // Reject if the final person type is not "student"
+      if (finalType !== "student") {
+        return NextResponse.json(
+          { error: "Level can only be set for students" },
+          { status: 400 }
+        );
+      }
+      if (
+        level !== null &&
+        ![
+          "License_1",
+          "License_2",
+          "License_3",
+          "Master_1",
+          "Master_2",
+        ].includes(level)
+      ) {
+        return NextResponse.json(
+          {
+            error:
+              "Invalid level. Allowed values: License_1, License_2, License_3, Master_1, Master_2",
+          },
+          { status: 400 }
+        );
+      }
+    }
+
     // Build update data
     const updateData: any = {};
     if (rfid_uuid !== undefined) updateData.rfid_uuid = rfid_uuid;
@@ -73,6 +112,8 @@ export async function PUT(
     if (nom !== undefined) updateData.nom = nom;
     if (prenom !== undefined) updateData.prenom = prenom;
     if (photo_path !== undefined) updateData.photo_path = photo_path;
+    if (level !== undefined) updateData.level = level;
+    if (classField !== undefined) updateData.class = classField;
 
     if (Object.keys(updateData).length === 0) {
       return NextResponse.json(

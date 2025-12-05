@@ -7,11 +7,11 @@
     "build": "prisma generate && next build",
     "start": "next start",
     "lint": "eslint",
-    "postinstall": "prisma generate",
-    "db:seed": "tsx prisma/seed.ts",
-    "db:clear": "tsx prisma/clear.ts"
+    "postinstall": "prisma generate"
   },
   "dependencies": {
+    "@prisma/adapter-pg": "^7.1.0",
+    "@prisma/adapter-ppg": "^7.1.0",
     "@prisma/client": "^7.1.0",
     "@types/bcryptjs": "^2.4.6",
     "@types/uuid": "^10.0.0",
@@ -19,14 +19,15 @@
     "date-fns": "^4.1.0",
     "lucide-react": "^0.553.0",
     "next": "^16.0.7",
-    "pg": "^8.11.3",
+    "pg": "^8.16.3",
     "react": "19.2.0",
     "react-dom": "19.2.0",
     "uuid": "^13.0.0"
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4",
-    "@types/node": "^20",
+    "@types/node": "^20.19.25",
+    "@types/pg": "^8.15.6",
     "@types/react": "^19",
     "@types/react-dom": "^19",
     "babel-plugin-react-compiler": "1.0.0",
@@ -36,7 +37,7 @@
     "eslint-config-next": "16.0.3",
     "prisma": "^7.1.0",
     "tailwindcss": "^4",
-    "tsx": "^4.7.0",
-    "typescript": "^5"
+    "tsx": "^4.21.0",
+    "typescript": "^5.9.3"
   }
 }

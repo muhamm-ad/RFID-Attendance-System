@@ -1,6 +1,6 @@
 // app/api/scan/route.ts
 import { NextRequest, NextResponse } from "next/server";
-import { ScanResult } from "@/lib/types";
+import { ScanResult } from "@/lib/db";
 import {
   getCurrentTrimester,
   getPersonWithPayments,

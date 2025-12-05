@@ -2,15 +2,15 @@
 // learn more about it in the docs: https://pris.ly/d/prisma-schema
 
 generator client {
-  provider = "prisma-client-js"
+  provider = "prisma-client"
+  output   = "./generated"
 }
-
 datasource db {
   provider = "postgresql"
 }
 
 model Person {
-  id         Int           @id @default(autoincrement())
+  id         Int           @id @default(dbgenerated("1000000 + floor(random() * 9000000)::int"))
   rfid_uuid  String        @unique
   type       PersonType
   nom        String

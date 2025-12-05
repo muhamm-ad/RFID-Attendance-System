@@ -1,6 +1,6 @@
 // app/api/stats/route.ts
 import { NextRequest, NextResponse } from "next/server";
-import prisma from "@/lib/db";
+import { prisma } from "@/lib/db";
 
 const DAY_IN_MS = 24 * 60 * 60 * 1000;
 

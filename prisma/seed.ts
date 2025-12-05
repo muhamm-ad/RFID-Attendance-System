@@ -1,6 +1,15 @@
-import { PrismaClient } from "@prisma/client";
+import { PrismaClient } from "@/prisma/generated/client";
+import { PrismaPg } from "@prisma/adapter-pg";
+import { Pool } from "pg";
+import { fileURLToPath } from "url";
+import "dotenv/config";
 
-const prisma = new PrismaClient();
+const pool = new Pool({ connectionString: process.env.DATABASE_URL! });
+const adapter = new PrismaPg(pool);
+
+const prisma = new PrismaClient({
+  adapter,
+});
 
 type PersonType = "student" | "teacher" | "staff" | "visitor";
 
@@ -1182,7 +1191,7 @@ async function main() {
 }
 
 // Only run main if this file is executed directly (not imported)
-if (require.main === module) {
+if (fileURLToPath(import.meta.url) === process.argv[1]) {
   main()
     .catch((e) => {
       console.error(e);

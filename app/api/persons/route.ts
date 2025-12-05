@@ -1,7 +1,6 @@
 // app/api/persons/route.ts
 import { NextRequest, NextResponse } from "next/server";
-import prisma from "@/lib/db";
-import { Person, PersonWithPayments } from "@/lib/types";
+import { prisma, PersonWithPayments } from "@/lib/db";
 import { getPersonWithPayments } from "@/lib/utils";
 
 // GET: Retrieve all persons
@@ -17,10 +16,7 @@ export async function GET(request: NextRequest) {
 
     const persons = await prisma.person.findMany({
       where,
-      orderBy: [
-        { nom: "asc" },
-        { prenom: "asc" },
-      ],
+      orderBy: [{ nom: "asc" }, { prenom: "asc" }],
     });
 
     // For students, add payment info
@@ -62,6 +58,8 @@ export async function POST(request: NextRequest) {
       nom,
       prenom,
       photo_path,
+      level,
+      class: classField,
     } = body;
 
     // Validate required fields
@@ -86,6 +84,29 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // Validate level if provided (only for students)
+    if (level && type !== "student") {
+      return NextResponse.json(
+        { error: "Level can only be set for students" },
+        { status: 400 }
+      );
+    }
+
+    if (
+      level &&
+      !["License_1", "License_2", "License_3", "Master_1", "Master_2"].includes(
+        level
+      )
+    ) {
+      return NextResponse.json(
+        {
+          error:
+            "Invalid level. Allowed values: License_1, License_2, License_3, Master_1, Master_2",
+        },
+        { status: 400 }
+      );
+    }
+
     // Insert the new person with rfid_uuid
     const newPerson = await prisma.person.create({
       data: {
@@ -94,15 +115,20 @@ export async function POST(request: NextRequest) {
         nom,
         prenom,
         photo_path,
+        level: level || null,
+        class: classField || null,
       },
     });
 
     // console.log(`✅ New person created: ${prenom} ${nom} (${type})`);
-    return NextResponse.json({
-      ...newPerson,
-      created_at: newPerson.created_at.toISOString(),
-      updated_at: newPerson.updated_at.toISOString(),
-    }, { status: 201 });
+    return NextResponse.json(
+      {
+        ...newPerson,
+        created_at: newPerson.created_at.toISOString(),
+        updated_at: newPerson.updated_at.toISOString(),
+      },
+      { status: 201 }
+    );
   } catch (error: any) {
     console.error("❌ Error while creating the person:", error);
 

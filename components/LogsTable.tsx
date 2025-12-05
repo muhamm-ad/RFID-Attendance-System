@@ -1,9 +1,19 @@
 // components/LogsTable.tsx
 "use client";
 
-import { useEffect, useMemo, useState, useRef } from "react";
-import { AttendanceLog } from "@/lib/types";
-import { ArrowUpDown, Clock, RefreshCw, LogIn, LogOut, UserCircle2, Search, ChevronDown, X, User } from "lucide-react";
+import { useEffect, useMemo, useState } from "react";
+import { AttendanceLog } from "@/lib/db";
+import {
+  Clock,
+  RefreshCw,
+  LogIn,
+  LogOut,
+  UserCircle2,
+} from "lucide-react";
+import DataTable, { Column } from "./DataTable";
+import PersonSearchDropdown from "./PersonSearchDropdown";
+import PersonAvatar from "./PersonAvatar";
+import { statusColors, BadgeGray, formatLevel, inputClasses, selectClasses } from "@/lib/ui-utils";
 
 export default function LogsTable() {
   const [logs, setLogs] = useState<AttendanceLog[]>([]);
@@ -14,21 +24,35 @@ export default function LogsTable() {
     endDate: "",
     status: "",
     action: "",
+    level: "",
+    class: "",
     limit: 100,
   });
   const [personQuery, setPersonQuery] = useState("");
-  const [persons, setPersons] = useState<Array<{ id: number; nom: string; prenom: string; rfid_uuid: string }>>([]);
-  const [isPersonDropdownOpen, setIsPersonDropdownOpen] = useState(false);
+  const [persons, setPersons] = useState<
+    Array<{
+      id: number;
+      nom: string;
+      prenom: string;
+      rfid_uuid: string;
+      level?: string | null;
+      class?: string | null;
+    }>
+  >([]);
+  const [uniqueLevels, setUniqueLevels] = useState<string[]>([]);
+  const [uniqueClasses, setUniqueClasses] = useState<string[]>([]);
   const [personSearchTerm, setPersonSearchTerm] = useState("");
   const [selectedPersonId, setSelectedPersonId] = useState<number | null>(null);
-  const personDropdownRef = useRef<HTMLDivElement>(null);
-  const personInputRef = useRef<HTMLInputElement>(null);
-  const [sortConfig, setSortConfig] = useState<{ key: SortKey; direction: "asc" | "desc" }>({
-    key: "timestamp",
-    direction: "desc",
-  });
-
-  type SortKey = "timestamp" | "person_name" | "person_id" | "person_type" | "action" | "status" | "rfid_uuid";
+  type SortKey =
+    | "timestamp"
+    | "person_name"
+    | "person_id"
+    | "person_type"
+    | "level"
+    | "class"
+    | "action"
+    | "status"
+    | "rfid_uuid";
 
   useEffect(() => {
     loadPersons();
@@ -36,35 +60,41 @@ export default function LogsTable() {
 
   useEffect(() => {
     loadLogs();
-  }, [filters.startDate, filters.endDate, filters.status, filters.action, filters.limit, selectedPersonId]);
-
-  // Close dropdown when clicking outside
-  useEffect(() => {
-    function handleClickOutside(event: MouseEvent) {
-      if (personDropdownRef.current && !personDropdownRef.current.contains(event.target as Node)) {
-        setIsPersonDropdownOpen(false);
-      }
-    }
-
-    if (isPersonDropdownOpen) {
-      document.addEventListener("mousedown", handleClickOutside);
-      return () => {
-        document.removeEventListener("mousedown", handleClickOutside);
-      };
-    }
-  }, [isPersonDropdownOpen]);
+  }, [
+    filters.startDate,
+    filters.endDate,
+    filters.status,
+    filters.action,
+    filters.level,
+    filters.class,
+    filters.limit,
+    selectedPersonId,
+  ]);
 
   async function loadPersons() {
     try {
       const res = await fetch("/api/persons");
       const data = await res.json();
       if (res.ok) {
-        setPersons(data.map((p: any) => ({
+        const personsData = data.map((p: any) => ({
           id: p.id,
           nom: p.nom,
           prenom: p.prenom,
           rfid_uuid: p.rfid_uuid,
-        })));
+          level: p.level,
+          class: p.class,
+        }));
+        setPersons(personsData);
+
+        // Extract unique levels and classes
+        const levels = new Set<string>();
+        const classes = new Set<string>();
+        personsData.forEach((p: any) => {
+          if (p.level) levels.add(p.level);
+          if (p.class) classes.add(p.class);
+        });
+        setUniqueLevels(Array.from(levels).sort());
+        setUniqueClasses(Array.from(classes).sort());
       }
     } catch (e) {
       console.error("Failed to load persons", e);
@@ -80,6 +110,8 @@ export default function LogsTable() {
       if (filters.endDate) params.append("endDate", filters.endDate);
       if (filters.status) params.append("status", filters.status);
       if (filters.action) params.append("action", filters.action);
+      if (filters.level) params.append("level", filters.level);
+      if (filters.class) params.append("class", filters.class);
       if (selectedPersonId) {
         params.append("personId", selectedPersonId.toString());
       }
@@ -96,84 +128,35 @@ export default function LogsTable() {
     }
   }
 
-  const statusColors = {
-    success: "bg-green-100 text-green-800",
-    failed: "bg-red-100 text-red-800",
-  };
-
   const actionIcons = {
     in: <LogIn size={16} className="text-blue-600" />,
     out: <LogOut size={16} className="text-purple-600" />,
   };
 
-  const sortedLogs = useMemo(() => {
-    const sorted = [...logs];
-    sorted.sort((a, b) => {
-      const getComparableValue = (log: AttendanceLog, key: SortKey) => {
-        switch (key) {
-          case "timestamp":
-            return new Date(log.timestamp).getTime();
-          case "person_id":
-            return log.person_id;
-          case "person_name":
-            return log.person_name.toLowerCase();
-          case "person_type":
-            return log.person_type.toLowerCase();
-          case "action":
-            return log.action;
-          case "status":
-            return log.status;
-          case "rfid_uuid":
-            return log.rfid_uuid.toLowerCase();
-          default:
-            return "";
-        }
-      };
-
-      const aValue = getComparableValue(a, sortConfig.key);
-      const bValue = getComparableValue(b, sortConfig.key);
-
-      if (typeof aValue === "number" && typeof bValue === "number") {
-        return sortConfig.direction === "asc" ? aValue - bValue : bValue - aValue;
-      }
-      return sortConfig.direction === "asc"
-        ? String(aValue).localeCompare(String(bValue))
-        : String(bValue).localeCompare(String(aValue));
-    });
-    return sorted;
-  }, [logs, sortConfig]);
-
-  const handleSort = (key: SortKey) => {
-    setSortConfig((prev) => {
-      if (prev.key === key) {
-        return { key, direction: prev.direction === "asc" ? "desc" : "asc" };
-      }
-      return { key, direction: "asc" };
-    });
+  const getSortValue = (log: AttendanceLog, key: string): any => {
+    switch (key) {
+      case "timestamp":
+        return new Date(log.timestamp).getTime();
+      case "person_id":
+        return log.person_id;
+      case "person_name":
+        return log.person_name.toLowerCase();
+      case "person_type":
+        return log.person_type.toLowerCase();
+      case "level":
+        return log.level?.toLowerCase() || "";
+      case "class":
+        return log.class?.toLowerCase() || "";
+      case "action":
+        return log.action;
+      case "status":
+        return log.status;
+      case "rfid_uuid":
+        return log.rfid_uuid.toLowerCase();
+      default:
+        return "";
+    }
   };
-
-  const renderSortableHeader = (label: string, key: SortKey) => (
-    <button
-      type="button"
-      onClick={() => handleSort(key)}
-      className="flex items-center gap-1 text-left text-xs font-medium text-gray-500 uppercase tracking-wider hover:text-gray-700"
-    >
-      {label}
-      <ArrowUpDown size={14} className={sortConfig.key === key ? "text-indigo-600" : "text-gray-400"} />
-    </button>
-  );
-
-  // Filter persons based on search term
-  const filteredPersons = persons.filter((person) => {
-    if (!personSearchTerm) return true;
-    const search = personSearchTerm.toLowerCase();
-    return (
-      person.nom.toLowerCase().includes(search) ||
-      person.prenom.toLowerCase().includes(search) ||
-      person.id.toString().includes(search) ||
-      person.rfid_uuid.toLowerCase().includes(search)
-    );
-  });
 
   async function handlePersonSelect(personId: number) {
     const person = persons.find((p) => p.id === personId);
@@ -181,32 +164,12 @@ export default function LogsTable() {
       setPersonSearchTerm(`${person.prenom} ${person.nom}`);
     }
     setSelectedPersonId(personId);
-    setIsPersonDropdownOpen(false);
-    // Automatically load logs for the selected person
     await loadLogs();
-  }
-
-  function handlePersonInputChange(value: string) {
-    setPersonSearchTerm(value);
-    setIsPersonDropdownOpen(true);
-    if (value === "") {
-      setSelectedPersonId(null);
-    }
-  }
-
-  function handlePersonInputFocus() {
-    setIsPersonDropdownOpen(true);
-    // Load persons if not already loaded
-    if (persons.length === 0) {
-      loadPersons();
-    }
   }
 
   async function clearPersonSelection() {
     setSelectedPersonId(null);
     setPersonSearchTerm("");
-    setIsPersonDropdownOpen(false);
-    // Reload all logs when clearing selection
     await loadLogs();
   }
 
@@ -218,7 +181,9 @@ export default function LogsTable() {
             <Clock size={28} />
             Attendance Logs
           </h2>
-          <p className="text-gray-600 mt-1">View all access attempts and attendance records</p>
+          <p className="text-gray-600 mt-1">
+            View all access attempts and attendance records
+          </p>
         </div>
         <button
           onClick={loadLogs}
@@ -233,77 +198,26 @@ export default function LogsTable() {
       <div className="mb-6">
         <div className="flex gap-3 items-end">
           <div className="flex-1">
-            <label className="block text-sm font-medium text-gray-700 mb-2 flex items-center gap-2">
-              <UserCircle2 size={16} />
-              Recherche personne
-            </label>
-            <div className="relative" ref={personDropdownRef}>
-              <div className="relative">
-                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 z-10" size={18} />
-                <input
-                  ref={personInputRef}
-                  type="text"
-                  value={personSearchTerm}
-                  onChange={(e) => handlePersonInputChange(e.target.value)}
-                  onFocus={handlePersonInputFocus}
-                  placeholder="Search by name, ID or UUID..."
-                  className="w-full pl-10 pr-10 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                />
-                <div className="absolute right-3 top-1/2 transform -translate-y-1/2 flex items-center gap-1">
-                  {selectedPersonId && (
-                    <button
-                      type="button"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        clearPersonSelection();
-                      }}
-                      className="text-gray-400 hover:text-gray-600"
-                    >
-                      <X size={18} />
-                    </button>
-                  )}
-                  <ChevronDown 
-                    size={18} 
-                    className={`text-gray-400 transition-transform ${isPersonDropdownOpen ? 'transform rotate-180' : ''}`}
-                  />
-                </div>
-              </div>
-              
-              {/* Dropdown List */}
-              {isPersonDropdownOpen && (
-                <div className="absolute z-50 w-full mt-1 bg-white border border-gray-300 rounded-lg shadow-lg max-h-60 overflow-auto">
-                  {filteredPersons.length === 0 ? (
-                    <div className="px-4 py-3 text-sm text-gray-500 text-center">
-                      No persons found
-                    </div>
-                  ) : (
-                    <ul className="py-1">
-                      {filteredPersons.map((person) => (
-                        <li
-                          key={person.id}
-                          onClick={() => handlePersonSelect(person.id)}
-                          className={`px-4 py-2 cursor-pointer hover:bg-indigo-50 ${
-                            selectedPersonId === person.id ? "bg-indigo-100" : ""
-                          }`}
-                        >
-                          <div className="flex items-center justify-between">
-                            <span className="text-sm font-medium text-gray-900">
-                              {person.prenom} {person.nom}
-                            </span>
-                            <span className="text-xs text-gray-500 font-mono">
-                              ID: {person.id}
-                            </span>
-                          </div>
-                          <div className="text-xs text-gray-400 font-mono mt-1">
-                            {person.rfid_uuid}
-                          </div>
-                        </li>
-                      ))}
-                    </ul>
-                  )}
-                </div>
-              )}
-            </div>
+            <PersonSearchDropdown
+              persons={persons}
+              selectedPersonId={selectedPersonId}
+              searchTerm={personSearchTerm}
+              onSearchChange={setPersonSearchTerm}
+              onPersonSelect={handlePersonSelect}
+              onClear={clearPersonSelection}
+              placeholder="Search by name, ID or UUID..."
+              label={
+                <span className="flex items-center gap-2">
+                  <UserCircle2 size={16} />
+                  Recherche personne
+                </span>
+              }
+              onFocus={() => {
+                if (persons.length === 0) {
+                  loadPersons();
+                }
+              }}
+            />
           </div>
           <div className="w-40">
             <label className="block text-sm font-medium text-gray-700 mb-2">
@@ -312,8 +226,10 @@ export default function LogsTable() {
             <input
               type="date"
               value={filters.startDate}
-              onChange={(e) => setFilters({ ...filters, startDate: e.target.value })}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
+              onChange={(e) =>
+                setFilters({ ...filters, startDate: e.target.value })
+              }
+              className={inputClasses}
             />
           </div>
           <div className="w-40">
@@ -323,8 +239,10 @@ export default function LogsTable() {
             <input
               type="date"
               value={filters.endDate}
-              onChange={(e) => setFilters({ ...filters, endDate: e.target.value })}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
+              onChange={(e) =>
+                setFilters({ ...filters, endDate: e.target.value })
+              }
+              className={inputClasses}
             />
           </div>
           <div className="w-32">
@@ -333,8 +251,10 @@ export default function LogsTable() {
             </label>
             <select
               value={filters.status}
-              onChange={(e) => setFilters({ ...filters, status: e.target.value })}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
+              onChange={(e) =>
+                setFilters({ ...filters, status: e.target.value })
+              }
+              className={selectClasses}
             >
               <option value="">All Status</option>
               <option value="success">Success</option>
@@ -347,12 +267,52 @@ export default function LogsTable() {
             </label>
             <select
               value={filters.action}
-              onChange={(e) => setFilters({ ...filters, action: e.target.value })}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
+              onChange={(e) =>
+                setFilters({ ...filters, action: e.target.value })
+              }
+              className={selectClasses}
             >
               <option value="">All Actions</option>
               <option value="in">Entry (In)</option>
               <option value="out">Exit (Out)</option>
+            </select>
+          </div>
+          <div className="w-40">
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              Level
+            </label>
+            <select
+              value={filters.level}
+              onChange={(e) =>
+                setFilters({ ...filters, level: e.target.value })
+              }
+              className={selectClasses}
+            >
+              <option value="">All Levels</option>
+              {uniqueLevels.map((level) => (
+                <option key={level} value={level}>
+                  {level.replace("_", " ")}
+                </option>
+              ))}
+            </select>
+          </div>
+          <div className="w-40">
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              Class
+            </label>
+            <select
+              value={filters.class}
+              onChange={(e) =>
+                setFilters({ ...filters, class: e.target.value })
+              }
+              className={selectClasses}
+            >
+              <option value="">All Classes</option>
+              {uniqueClasses.map((classItem) => (
+                <option key={classItem} value={classItem}>
+                  {classItem}
+                </option>
+              ))}
             </select>
           </div>
         </div>
@@ -364,112 +324,112 @@ export default function LogsTable() {
         </div>
       )}
 
-      <div className="overflow-x-auto">
-        <table className="min-w-full divide-y divide-gray-200">
-          <thead className="bg-gray-50">
-            <tr>
-              <th className="px-4 py-3">
-                {renderSortableHeader("Timestamp", "timestamp")}
-              </th>
-              <th className="px-4 py-3">
-                {renderSortableHeader("Person", "person_name")}
-              </th>
-              <th className="px-4 py-3">
-                {renderSortableHeader("Person ID", "person_id")}
-              </th>
-              <th className="px-4 py-3">
-                {renderSortableHeader("Type", "person_type")}
-              </th>
-              <th className="px-4 py-3">
-                {renderSortableHeader("Action", "action")}
-              </th>
-              <th className="px-4 py-3">
-                {renderSortableHeader("Status", "status")}
-              </th>
-              <th className="px-4 py-3">
-                {renderSortableHeader("RFID UUID", "rfid_uuid")}
-              </th>
-            </tr>
-          </thead>
-          <tbody className="bg-white divide-y divide-gray-200">
-            {loading ? (
-              <tr>
-                <td colSpan={7} className="px-4 py-8 text-center text-gray-500">
-                  Loading...
-                </td>
-              </tr>
-            ) : logs.length === 0 ? (
-              <tr>
-                <td colSpan={7} className="px-4 py-8 text-center text-gray-500">
-                  No records found
-                </td>
-              </tr>
-            ) : (
-              sortedLogs.map((log) => (
-                <tr key={log.id} className="hover:bg-gray-50">
-                  <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-600">
-                    {new Date(log.timestamp).toLocaleString()}
-                  </td>
-                  <td className="px-4 py-3 whitespace-nowrap">
-                    <div className="flex items-center gap-3">
-                      {log.photo_path && log.photo_path.trim() !== "" ? (
-                        <img
-                          src={log.photo_path}
-                          alt={log.person_name}
-                          className="w-10 h-10 rounded-full object-cover border-2 border-gray-200"
-                          onError={(e) => {
-                            // If image fails to load, hide image and show icon
-                            const target = e.target as HTMLImageElement;
-                            target.style.display = "none";
-                            const iconContainer = target.parentElement?.querySelector(".photo-icon-container") as HTMLElement;
-                            if (iconContainer) {
-                              iconContainer.style.display = "flex";
-                            }
-                          }}
-                        />
-                      ) : null}
-                      <div
-                        className={`w-10 h-10 rounded-full bg-gray-200 flex items-center justify-center photo-icon-container ${
-                          log.photo_path && log.photo_path.trim() !== "" ? "hidden" : ""
-                        }`}
-                      >
-                        <User size={20} className="text-gray-500" />
-                      </div>
-                      <div className="font-medium text-gray-900">{log.person_name}</div>
-                    </div>
-                  </td>
-                  <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-600 font-mono">
-                    {log.person_id}
-                  </td>
-                  <td className="px-4 py-3 whitespace-nowrap">
-                    <span className="px-2 py-1 text-xs font-medium rounded-full bg-gray-100 text-gray-800 capitalize">
-                      {log.person_type}
-                    </span>
-                  </td>
-                  <td className="px-4 py-3 whitespace-nowrap">
-                    <div className="flex items-center gap-2">
-                      {actionIcons[log.action]}
-                      <span className="text-sm text-gray-700 capitalize">{log.action}</span>
-                    </div>
-                  </td>
-                  <td className="px-4 py-3 whitespace-nowrap">
-                    <span
-                      className={`px-2 py-1 text-xs font-medium rounded-full ${
-                        statusColors[log.status]
-                      }`}
-                    >
-                      {log.status}
-                    </span>
-                  </td>
-                  <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-600 font-mono">
-                    {log.rfid_uuid}
-                  </td>
-                </tr>
-              ))
-            )}
-          </tbody>
-        </table>
-      </div>
+      <DataTable
+        data={logs}
+        columns={useMemo<Column<AttendanceLog>[]>(
+          () => [
+            {
+              key: "timestamp",
+              label: "Timestamp",
+              sortKey: "timestamp",
+              render: (log) => (
+                <span className="text-sm text-gray-600">
+                  {new Date(log.timestamp).toLocaleString()}
+                </span>
+              ),
+            },
+            {
+              key: "person",
+              label: "Person",
+              sortKey: "person_name",
+              render: (log) => (
+                <div className="flex items-center gap-3">
+                  <PersonAvatar
+                    photoPath={log.photo_path}
+                    name={log.person_name}
+                    size="md"
+                  />
+                  <div className="font-medium text-gray-900">
+                    {log.person_name}
+                  </div>
+                </div>
+              ),
+            },
+            {
+              key: "person_id",
+              label: "Person ID",
+              sortKey: "person_id",
+              render: (log) => (
+                <span className="text-sm text-gray-600 font-mono">
+                  {log.person_id}
+                </span>
+              ),
+            },
+            {
+              key: "person_type",
+              label: "Type",
+              sortKey: "person_type",
+              render: (log) => <BadgeGray>{log.person_type}</BadgeGray>,
+            },
+            {
+              key: "level",
+              label: "Level",
+              sortKey: "level",
+              render: (log) => <BadgeGray>{formatLevel(log.level)}</BadgeGray>,
+            },
+            {
+              key: "class",
+              label: "Class",
+              sortKey: "class",
+              render: (log) => <BadgeGray>{log.class || "N/A"}</BadgeGray>,
+            },
+            {
+              key: "action",
+              label: "Action",
+              sortKey: "action",
+              render: (log) => (
+                <div className="flex items-center gap-2">
+                  {actionIcons[log.action]}
+                  <span className="text-sm text-gray-700 capitalize">
+                    {log.action}
+                  </span>
+                </div>
+              ),
+            },
+            {
+              key: "status",
+              label: "Status",
+              sortKey: "status",
+              render: (log) => (
+                <span
+                  className={`px-2 py-1 text-xs font-medium rounded-full ${
+                    statusColors[log.status]
+                  }`}
+                >
+                  {log.status}
+                </span>
+              ),
+            },
+            {
+              key: "rfid_uuid",
+              label: "RFID UUID",
+              sortKey: "rfid_uuid",
+              render: (log) => (
+                <span className="text-sm text-gray-600 font-mono">
+                  {log.rfid_uuid}
+                </span>
+              ),
+            },
+          ],
+          []
+        )}
+        loading={loading}
+        emptyMessage="No records found"
+        limit={filters.limit}
+        defaultSortKey="timestamp"
+        defaultSortDirection="desc"
+        getSortValue={getSortValue}
+      />
 
       <div className="flex justify-end mt-4">
         <div className="w-40">
@@ -478,8 +438,10 @@ export default function LogsTable() {
           </label>
           <select
             value={filters.limit}
-            onChange={(e) => setFilters({ ...filters, limit: parseInt(e.target.value) })}
-            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
+            onChange={(e) =>
+              setFilters({ ...filters, limit: parseInt(e.target.value) })
+            }
+            className={selectClasses}
           >
             <option value="50">50</option>
             <option value="100">100</option>
@@ -491,5 +453,3 @@ export default function LogsTable() {
     </div>
   );
 }
-
-
