@@ -2,7 +2,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma, PersonWithPayments } from "@/lib/db";
 import { getPersonWithPayments } from "@/lib/utils";
-import { Person as PrismaPerson } from "@prisma/client";
 
 export async function GET(request: NextRequest) {
   try {
@@ -20,7 +19,6 @@ export async function GET(request: NextRequest) {
     // Check if query is a number (for ID search)
     const isNumeric = !isNaN(Number(query));
     const queryId = isNumeric ? Number(query) : null;
-    const searchPattern = `%${query}%`;
 
     const where: any = {
       OR: [
@@ -49,7 +47,7 @@ export async function GET(request: NextRequest) {
 
     // For students, add payment info
     const personsWithPayments = await Promise.all(
-      results.map(async (person: PrismaPerson) => {
+      results.map(async (person) => {
         if (person.type === "student") {
           const personWithPayments = await getPersonWithPayments(person.rfid_uuid);
           return personWithPayments || person;

@@ -1,7 +1,6 @@
 // app/api/attendance/route.ts
 import { NextRequest, NextResponse } from "next/server";
 import { prisma, type AttendanceLog } from "@/lib/db";
-import { Prisma } from "@prisma/client";
 
 export async function GET(request: NextRequest) {
   try {
@@ -89,23 +88,7 @@ export async function GET(request: NextRequest) {
       skip: offset,
     });
 
-    type AttendanceWithPerson = Prisma.AttendanceGetPayload<{
-      include: {
-        person: {
-          select: {
-            nom: true;
-            prenom: true;
-            type: true;
-            rfid_uuid: true;
-            photo_path: true;
-            level: true;
-            class: true;
-          };
-        };
-      };
-    }>;
-
-    const formattedLogs: AttendanceLog[] = logs.map((log: AttendanceWithPerson) => ({
+    const formattedLogs: AttendanceLog[] = logs.map((log) => ({
       id: log.id,
       person_id: log.person_id,
       action: log.action,
@@ -115,8 +98,8 @@ export async function GET(request: NextRequest) {
       person_type: log.person.type,
       rfid_uuid: log.person.rfid_uuid,
       photo_path: log.person.photo_path ?? undefined,
-      level: log.person.level,
-      class: log.person.class,
+      level: log.person.level ?? undefined,
+      class: log.person.class ?? undefined,
     }));
 
     // console.log(`📋 ${formattedLogs.length} attendance records retrieved`);

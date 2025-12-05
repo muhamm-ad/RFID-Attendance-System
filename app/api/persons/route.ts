@@ -1,8 +1,7 @@
 // app/api/persons/route.ts
 import { NextRequest, NextResponse } from "next/server";
-import { prisma, PersonWithPayments } from "@/lib/db";
+import { prisma, type PersonWithPayments } from "@/lib/db";
 import { getPersonWithPayments } from "@/lib/utils";
-import { Person as PrismaPerson } from "@prisma/client";
 
 // GET: Retrieve all persons
 export async function GET(request: NextRequest) {
@@ -22,7 +21,7 @@ export async function GET(request: NextRequest) {
 
     // For students, add payment info
     const personsWithPayments = await Promise.all(
-      persons.map(async (person: PrismaPerson) => {
+      persons.map(async (person) => {
         if (person.type === "student") {
           return await getPersonWithPayments(person.rfid_uuid);
         }
@@ -64,11 +63,11 @@ export async function POST(request: NextRequest) {
     } = body;
 
     // Validate required fields
-    if (!rfid_uuid || !type || !nom || !prenom) {
+    if (!rfid_uuid || !type || !nom || !prenom || !photo_path) {
       return NextResponse.json(
         {
           error:
-            "Missing required fields (rfid_uuid, type, nom, prenom)",
+            "Missing required fields (rfid_uuid, type, nom, prenom, photo_path)",
         },
         { status: 400 }
       );
@@ -115,7 +114,7 @@ export async function POST(request: NextRequest) {
         type: type as any,
         nom,
         prenom,
-        photo_path: photo_path && photo_path.trim() !== "" ? photo_path : null,
+        photo_path,
         level: level || null,
         class: classField || null,
       },

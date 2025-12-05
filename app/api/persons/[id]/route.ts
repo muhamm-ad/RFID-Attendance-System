@@ -1,6 +1,6 @@
 // app/api/persons/[id]/route.ts
 import { NextRequest, NextResponse } from "next/server";
-import { prisma } from "@/lib/db";
+import prisma from "@/lib/db";
 import { getPersonWithPayments } from "@/lib/utils";
 
 // GET: Retrieve a person by ID

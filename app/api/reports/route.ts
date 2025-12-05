@@ -1,7 +1,6 @@
 // app/api/reports/route.ts
 import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/db";
-import { Prisma } from "@prisma/client";
 
 export async function GET(request: NextRequest) {
   try {
@@ -20,7 +19,7 @@ export async function GET(request: NextRequest) {
     const start = new Date(startDate);
     const end = new Date(endDate + "T23:59:59");
 
-    let report: any = {
+    const report: any = {
       start_date: startDate,
       end_date: endDate,
       generated_at: new Date().toISOString(),
@@ -39,9 +38,8 @@ export async function GET(request: NextRequest) {
         });
 
         // Group by date
-        type AttendanceRecord = Prisma.AttendanceGetPayload<{}>;
         const dailyMap = new Map<string, any>();
-        attendanceRecords.forEach((record: AttendanceRecord) => {
+        attendanceRecords.forEach((record) => {
           const dateKey = record.attendance_date.toISOString().split("T")[0];
           if (!dailyMap.has(dateKey)) {
             dailyMap.set(dateKey, {
@@ -79,15 +77,8 @@ export async function GET(request: NextRequest) {
           },
         });
 
-        type GroupByStat = {
-          person_id: number;
-          _count: {
-            id: number;
-          };
-        };
-        
         const personStats = await Promise.all(
-          personStatsData.map(async (stat: GroupByStat) => {
+          personStatsData.map(async (stat) => {
             const person = await prisma.person.findUnique({
               where: { id: stat.person_id },
             });
@@ -102,9 +93,9 @@ export async function GET(request: NextRequest) {
               },
             });
 
-            const successful = records.filter((r: AttendanceRecord) => r.status === "success").length;
-            const entries = records.filter((r: AttendanceRecord) => r.action === "in").length;
-            const dates = records.map((r: AttendanceRecord) => r.attendance_date);
+            const successful = records.filter((r) => r.status === "success").length;
+            const entries = records.filter((r) => r.action === "in").length;
+            const dates = records.map((r) => r.attendance_date);
 
             return {
               id: person?.id,
@@ -115,8 +106,8 @@ export async function GET(request: NextRequest) {
               total_scans: stat._count.id,
               successful_scans: successful,
               entries: entries,
-              first_scan: dates.length > 0 ? Math.min(...dates.map((d: Date) => d.getTime())) : null,
-              last_scan: dates.length > 0 ? Math.max(...dates.map((d: Date) => d.getTime())) : null,
+              first_scan: dates.length > 0 ? Math.min(...dates.map((d) => d.getTime())) : null,
+              last_scan: dates.length > 0 ? Math.max(...dates.map((d) => d.getTime())) : null,
             };
           })
         );
@@ -154,21 +145,9 @@ export async function GET(request: NextRequest) {
         });
 
         // Group by trimester and payment method
-        type PaymentWithStudentPayments = Prisma.PaymentGetPayload<{
-          include: {
-            student_payments: {
-              include: {
-                student: true;
-              };
-            };
-          };
-        }>;
-        
-        type StudentPaymentWithStudent = PaymentWithStudentPayments["student_payments"][number];
-        
         const summaryMap = new Map<string, any>();
-        payments.forEach((payment: PaymentWithStudentPayments) => {
-          payment.student_payments.forEach((sp: StudentPaymentWithStudent) => {
+        payments.forEach((payment) => {
+          payment.student_payments.forEach((sp) => {
             const key = `${sp.trimester}-${payment.payment_method}`;
             if (!summaryMap.has(key)) {
               summaryMap.set(key, {
@@ -195,8 +174,8 @@ export async function GET(request: NextRequest) {
         }));
 
         // Detailed payment list
-        const detailedPayments = payments.flatMap((payment: PaymentWithStudentPayments) =>
-          payment.student_payments.map((sp: StudentPaymentWithStudent) => ({
+        const detailedPayments = payments.flatMap((payment) =>
+          payment.student_payments.map((sp) => ({
             nom: sp.student.nom,
             prenom: sp.student.prenom,
             photo_path: sp.student.photo_path,
