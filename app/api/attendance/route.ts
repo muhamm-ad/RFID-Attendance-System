@@ -1,6 +1,7 @@
 // app/api/attendance/route.ts
 import { NextRequest, NextResponse } from "next/server";
 import { prisma, type AttendanceLog } from "@/lib/db";
+import { Prisma } from "@prisma/client";
 
 export async function GET(request: NextRequest) {
   try {
@@ -88,7 +89,23 @@ export async function GET(request: NextRequest) {
       skip: offset,
     });
 
-    const formattedLogs: AttendanceLog[] = logs.map((log) => ({
+    type AttendanceWithPerson = Prisma.AttendanceGetPayload<{
+      include: {
+        person: {
+          select: {
+            nom: true;
+            prenom: true;
+            type: true;
+            rfid_uuid: true;
+            photo_path: true;
+            level: true;
+            class: true;
+          };
+        };
+      };
+    }>;
+
+    const formattedLogs: AttendanceLog[] = logs.map((log: AttendanceWithPerson) => ({
       id: log.id,
       person_id: log.person_id,
       action: log.action,
