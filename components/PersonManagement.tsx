@@ -34,6 +34,13 @@ export default function PersonManagement() {
   const [error, setError] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState("");
   const [typeFilter, setTypeFilter] = useState<string>("all");
+  const [filters, setFilters] = useState({
+    level: "",
+    class: "",
+    limit: 25,
+  });
+  const [uniqueLevels, setUniqueLevels] = useState<string[]>([]);
+  const [uniqueClasses, setUniqueClasses] = useState<string[]>([]);
   const [showForm, setShowForm] = useState(false);
   const [editingPerson, setEditingPerson] = useState<PersonWithPayments | null>(
     null
@@ -72,20 +79,40 @@ export default function PersonManagement() {
       const res = await fetch(url);
       const data = await res.json();
       if (!res.ok) throw new Error(data?.error || "Failed to load persons");
-      setPersons(data);
+      
+      // Extract unique levels and classes
+      const levels = new Set<string>();
+      const classes = new Set<string>();
+      data.forEach((p: PersonWithPayments) => {
+        if (p.level) levels.add(p.level);
+        if (p.class) classes.add(p.class);
+      });
+      setUniqueLevels(Array.from(levels).sort());
+      setUniqueClasses(Array.from(classes).sort());
+      
+      // Apply filters
+      let filtered = data;
+      if (filters.level) {
+        filtered = filtered.filter((p: PersonWithPayments) => p.level === filters.level);
+      }
+      if (filters.class) {
+        filtered = filtered.filter((p: PersonWithPayments) => p.class === filters.class);
+      }
+      
+      setPersons(filtered);
       setAllPersons(data); // Store all persons for dropdown
     } catch (e: any) {
       setError(e.message || "Unexpected error");
     } finally {
       setLoading(false);
     }
-  }, [typeFilter]);
+  }, [typeFilter, filters.level, filters.class]);
 
   useEffect(() => {
     loadPersons();
   }, [loadPersons]);
 
-  // Auto-search when typing (debounced)
+  // Auto-search when typing (debounced) or when filters change
   useEffect(() => {
     if (searchTerm.length >= 2 && !selectedPersonId) {
       const timeoutId = setTimeout(() => {
@@ -96,7 +123,7 @@ export default function PersonManagement() {
       loadPersons();
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [searchTerm, selectedPersonId]);
+  }, [searchTerm, selectedPersonId, filters.level, filters.class]);
 
   async function handleSearch() {
     if (searchTerm.length < 2 && !selectedPersonId) {
@@ -106,13 +133,13 @@ export default function PersonManagement() {
     setLoading(true);
     setError(null);
     try {
+      let data: PersonWithPayments[] = [];
       if (selectedPersonId) {
         // If a person is selected, filter locally from all persons
         if (allPersons.length > 0) {
-          const filtered = allPersons.filter(
+          data = allPersons.filter(
             (p: PersonWithPayments) => p.id === selectedPersonId
           );
-          setPersons(filtered);
         } else {
           // If allPersons is not loaded, load it first
           const url =
@@ -120,13 +147,12 @@ export default function PersonManagement() {
               ? "/api/persons"
               : `/api/persons?type=${typeFilter}`;
           const res = await fetch(url);
-          const data = await res.json();
-          if (!res.ok) throw new Error(data?.error || "Failed to load persons");
-          setAllPersons(data);
-          const filtered = data.filter(
+          const fetchedData = await res.json();
+          if (!res.ok) throw new Error(fetchedData?.error || "Failed to load persons");
+          setAllPersons(fetchedData);
+          data = fetchedData.filter(
             (p: PersonWithPayments) => p.id === selectedPersonId
           );
-          setPersons(filtered);
         }
       } else {
         const url =
@@ -136,10 +162,20 @@ export default function PersonManagement() {
                 searchTerm
               )}&type=${typeFilter}`;
         const res = await fetch(url);
-        const data = await res.json();
-        if (!res.ok) throw new Error(data?.error || "Search failed");
-        setPersons(data);
+        const fetchedData = await res.json();
+        if (!res.ok) throw new Error(fetchedData?.error || "Search failed");
+        data = fetchedData;
       }
+      
+      // Apply level and class filters
+      if (filters.level) {
+        data = data.filter((p: PersonWithPayments) => p.level === filters.level);
+      }
+      if (filters.class) {
+        data = data.filter((p: PersonWithPayments) => p.class === filters.class);
+      }
+      
+      setPersons(data);
     } catch (e: any) {
       setError(e.message || "Unexpected error");
     } finally {
@@ -407,6 +443,10 @@ export default function PersonManagement() {
         return `${person.prenom} ${person.nom}`.toLowerCase();
       case "type":
         return person.type;
+      case "level":
+        return person.level || "";
+      case "class":
+        return person.class?.toLowerCase() || "";
       case "rfid_uuid":
         return person.rfid_uuid.toLowerCase();
       case "updated_at":
@@ -442,34 +482,79 @@ export default function PersonManagement() {
       </div>
 
       {/* Search and Filter */}
-      <div className="mb-6 flex gap-3">
-        <div className="flex-1">
-          <PersonSearchDropdown
-            persons={allPersons}
-            selectedPersonId={selectedPersonId}
-            searchTerm={searchTerm}
-            onSearchChange={handleSearchInputChange}
-            onPersonSelect={handlePersonSelect}
-            onClear={clearSearchSelection}
-            placeholder="Search by UUID, ID or Name..."
-            onFocus={() => {
-              if (allPersons.length === 0) {
-                loadPersons();
+      <div className="mb-6">
+        <div className="flex gap-3 items-end">
+          <div className="flex-1 min-w-0">
+            <PersonSearchDropdown
+              persons={allPersons}
+              selectedPersonId={selectedPersonId}
+              searchTerm={searchTerm}
+              onSearchChange={handleSearchInputChange}
+              onPersonSelect={handlePersonSelect}
+              onClear={clearSearchSelection}
+              placeholder="Search by UUID, ID or Name..."
+              onFocus={() => {
+                if (allPersons.length === 0) {
+                  loadPersons();
+                }
+              }}
+            />
+          </div>
+          <div className="w-48 flex-shrink-0">
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              Type
+            </label>
+            <select
+              value={typeFilter}
+              onChange={(e) => setTypeFilter(e.target.value)}
+              className={selectClasses}
+            >
+              <option value="all">All Types</option>
+              <option value="student">Students</option>
+              <option value="teacher">Teachers</option>
+              <option value="staff">Staff</option>
+              <option value="visitor">Visitors</option>
+            </select>
+          </div>
+          <div className="w-40 flex-shrink-0">
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              Level
+            </label>
+            <select
+              value={filters.level}
+              onChange={(e) =>
+                setFilters({ ...filters, level: e.target.value })
               }
-            }}
-          />
+              className={selectClasses}
+            >
+              <option value="">All Levels</option>
+              {uniqueLevels.map((level) => (
+                <option key={level} value={level}>
+                  {formatLevel(level)}
+                </option>
+              ))}
+            </select>
+          </div>
+          <div className="w-40 flex-shrink-0">
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              Class
+            </label>
+            <select
+              value={filters.class}
+              onChange={(e) =>
+                setFilters({ ...filters, class: e.target.value })
+              }
+              className={selectClasses}
+            >
+              <option value="">All Classes</option>
+              {uniqueClasses.map((classItem) => (
+                <option key={classItem} value={classItem}>
+                  {classItem}
+                </option>
+              ))}
+            </select>
+          </div>
         </div>
-        <select
-          value={typeFilter}
-          onChange={(e) => setTypeFilter(e.target.value)}
-          className={selectClasses}
-        >
-          <option value="all">All Types</option>
-          <option value="student">Students</option>
-          <option value="teacher">Teachers</option>
-          <option value="staff">Staff</option>
-          <option value="visitor">Visitors</option>
-        </select>
       </div>
 
       {error && (
@@ -720,6 +805,7 @@ export default function PersonManagement() {
               key: "name",
               label: "Name",
               sortKey: "nom",
+              cellClassName: "text-left",
               render: (person) => (
                 <div className="flex items-center gap-3">
                   <PersonAvatar
@@ -750,7 +836,7 @@ export default function PersonManagement() {
             {
               key: "level",
               label: "Level",
-              sortable: false,
+              sortKey: "level",
               render: (person) => (
                 <span className="text-sm text-gray-600">
                   {person.type === "student" && person.level ? (
@@ -764,7 +850,7 @@ export default function PersonManagement() {
             {
               key: "class",
               label: "Class",
-              sortable: false,
+              sortKey: "class",
               render: (person) => (
                 <span className="text-sm text-gray-600">
                   {person.class ? (
@@ -871,9 +957,30 @@ export default function PersonManagement() {
         )}
         loading={loading}
         emptyMessage="No persons found"
-        limit={100}
+        limit={filters.limit}
         getSortValue={getSortValue}
       />
+
+      <div className="flex justify-end mt-4">
+        <div className="w-40">
+          <label className="block text-sm font-medium text-gray-700 mb-1 text-right">
+            Limit
+          </label>
+          <select
+            value={filters.limit}
+            onChange={(e) =>
+              setFilters({ ...filters, limit: parseInt(e.target.value) })
+            }
+            className={selectClasses}
+          >
+            <option value="25">25</option>
+            <option value="50">50</option>
+            <option value="100">100</option>
+            <option value="200">200</option>
+            <option value="500">500</option>
+          </select>
+        </div>
+      </div>
     </div>
   );
 }

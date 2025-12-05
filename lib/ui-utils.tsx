@@ -51,7 +51,7 @@ export const typeColors = {
 
 // Helper to format level
 export function formatLevel(level: string | null | undefined): string {
-  if (!level) return "N/A";
+  if (!level) return "-";
   return level.replace("_", " ");
 }
 

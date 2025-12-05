@@ -26,7 +26,8 @@ export default function LogsTable() {
     action: "",
     level: "",
     class: "",
-    limit: 100,
+    type: "",
+    limit: 25,
   });
   const [persons, setPersons] = useState<PersonWithPayments[]>([]);
   const [uniqueLevels, setUniqueLevels] = useState<string[]>([]);
@@ -70,6 +71,7 @@ export default function LogsTable() {
     filters.action,
     filters.level,
     filters.class,
+    filters.type,
     filters.limit,
     selectedPersonId,
   ]);
@@ -171,8 +173,8 @@ export default function LogsTable() {
 
       {/* Filters */}
       <div className="mb-6">
-        <div className="flex gap-3 items-end">
-          <div className="flex-1">
+        <div className="flex gap-3 items-end overflow-x-auto pb-2">
+          <div className="flex-1 min-w-[300px] flex-shrink-0">
             <PersonSearchDropdown
               persons={persons}
               selectedPersonId={selectedPersonId}
@@ -194,7 +196,7 @@ export default function LogsTable() {
               }}
             />
           </div>
-          <div className="w-40">
+          <div className="w-40 flex-shrink-0">
             <label className="block text-sm font-medium text-gray-700 mb-2">
               Start date
             </label>
@@ -207,7 +209,7 @@ export default function LogsTable() {
               className={inputClasses}
             />
           </div>
-          <div className="w-40">
+          <div className="w-40 flex-shrink-0">
             <label className="block text-sm font-medium text-gray-700 mb-2">
               End date
             </label>
@@ -220,7 +222,7 @@ export default function LogsTable() {
               className={inputClasses}
             />
           </div>
-          <div className="w-32">
+          <div className="w-32 flex-shrink-0">
             <label className="block text-sm font-medium text-gray-700 mb-2">
               Status
             </label>
@@ -236,7 +238,7 @@ export default function LogsTable() {
               <option value="failed">Failed</option>
             </select>
           </div>
-          <div className="w-32">
+          <div className="w-32 flex-shrink-0">
             <label className="block text-sm font-medium text-gray-700 mb-2">
               Action
             </label>
@@ -252,7 +254,7 @@ export default function LogsTable() {
               <option value="out">Exit (Out)</option>
             </select>
           </div>
-          <div className="w-40">
+          <div className="w-40 flex-shrink-0">
             <label className="block text-sm font-medium text-gray-700 mb-2">
               Level
             </label>
@@ -271,7 +273,7 @@ export default function LogsTable() {
               ))}
             </select>
           </div>
-          <div className="w-40">
+          <div className="w-40 flex-shrink-0">
             <label className="block text-sm font-medium text-gray-700 mb-2">
               Class
             </label>
@@ -288,6 +290,24 @@ export default function LogsTable() {
                   {classItem}
                 </option>
               ))}
+            </select>
+          </div>
+          <div className="w-48 flex-shrink-0">
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              Type
+            </label>
+            <select
+              value={filters.type}
+              onChange={(e) =>
+                setFilters({ ...filters, type: e.target.value })
+              }
+              className={selectClasses}
+            >
+              <option value="">All Types</option>
+              <option value="student">Students</option>
+              <option value="teacher">Teachers</option>
+              <option value="staff">Staff</option>
+              <option value="visitor">Visitors</option>
             </select>
           </div>
         </div>
@@ -356,7 +376,7 @@ export default function LogsTable() {
               key: "class",
               label: "Class",
               sortKey: "class",
-              render: (log) => <BadgeGray>{log.class || "N/A"}</BadgeGray>,
+              render: (log) => <BadgeGray>{log.class || "-"}</BadgeGray>,
             },
             {
               key: "action",
@@ -418,6 +438,7 @@ export default function LogsTable() {
             }
             className={selectClasses}
           >
+            <option value="25">25</option>
             <option value="50">50</option>
             <option value="100">100</option>
             <option value="200">200</option>

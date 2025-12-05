@@ -404,7 +404,7 @@ export default function StatisticsDashboard() {
                     </td>
                     <td className="px-4 py-3 whitespace-nowrap">
                       <span className="px-2 py-1 text-xs font-medium rounded-full bg-gray-100 text-gray-800 capitalize">
-                        {person.type || "N/A"}
+                        {person.type || "-"}
                       </span>
                     </td>
                     <td className="px-4 py-3 whitespace-nowrap text-gray-600">

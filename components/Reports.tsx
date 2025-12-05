@@ -284,10 +284,10 @@ export default function Reports() {
                             </td>
                             <td className="px-4 py-3 whitespace-nowrap">{person.entries}</td>
                             <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-600">
-                              {person.first_scan ? new Date(person.first_scan).toLocaleString() : "N/A"}
+                              {person.first_scan ? new Date(person.first_scan).toLocaleString() : "-"}
                             </td>
                             <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-600">
-                              {person.last_scan ? new Date(person.last_scan).toLocaleString() : "N/A"}
+                              {person.last_scan ? new Date(person.last_scan).toLocaleString() : "-"}
                             </td>
                           </tr>
                         ))}

@@ -33,7 +33,7 @@ export default function DataTable<T extends { id?: number | string }>({
   columns,
   loading = false,
   emptyMessage = "No records found",
-  limit = 100,
+  limit = 25,
   defaultSortKey,
   defaultSortDirection = null,
   onSort,
@@ -118,7 +118,7 @@ export default function DataTable<T extends { id?: number | string }>({
             {columns.map((column) => (
               <th
                 key={column.key}
-                className={`px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider ${
+                className={`px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider ${
                   column.sortable !== false
                     ? "cursor-pointer hover:bg-gray-100"
                     : ""
@@ -127,7 +127,7 @@ export default function DataTable<T extends { id?: number | string }>({
                   column.sortable !== false && handleSort(column.sortKey || column.key)
                 }
               >
-                <div className="flex items-center gap-1">
+                <div className="flex items-center justify-center gap-1">
                   {column.label}
                   {column.sortable !== false && getSortIcon(column.sortKey || column.key)}
                 </div>
@@ -160,7 +160,7 @@ export default function DataTable<T extends { id?: number | string }>({
                 {columns.map((column) => (
                   <td
                     key={column.key}
-                    className={`px-4 py-3 whitespace-nowrap ${column.cellClassName || ""}`}
+                    className={`px-4 py-3 whitespace-nowrap text-center ${column.cellClassName || ""}`}
                   >
                     {column.render(item)}
                   </td>
