@@ -9,6 +9,7 @@ import {
   Edit2,
   Trash2,
   X,
+  Scan,
 } from "lucide-react";
 import DataTable, { Column } from "./DataTable";
 import PersonSearchDropdown from "./PersonSearchDropdown";
@@ -56,6 +57,9 @@ export default function PersonManagement() {
   const [selectedPhoto, setSelectedPhoto] = useState<File | null>(null);
   const [photoPreview, setPhotoPreview] = useState<string | null>(null);
   const [uploadingPhoto, setUploadingPhoto] = useState(false);
+  const [isScanning, setIsScanning] = useState(false);
+  const [scanStatus, setScanStatus] = useState<"idle" | "scanning" | "success" | "error">("idle");
+  const [lastScanTimestamp, setLastScanTimestamp] = useState<string | null>(null);
 
   const loadPersons = useCallback(async () => {
     setLoading(true);
@@ -209,7 +213,88 @@ export default function PersonManagement() {
     setPhotoPreview(null);
     setEditingPerson(null);
     setShowForm(false);
+    setIsScanning(false);
+    setScanStatus("idle");
+    setLastScanTimestamp(null);
   }
+
+  // Check if UUID already exists
+  const checkDuplicateUUID = useCallback((uuid: string): boolean => {
+    if (!uuid) return false;
+    return allPersons.some(
+      (p) => p.rfid_uuid.toLowerCase() === uuid.toLowerCase() && 
+             (!editingPerson || p.id !== editingPerson.id)
+    );
+  }, [allPersons, editingPerson]);
+
+  // Start scanning - poll for new scans
+  const startScanning = useCallback(() => {
+    setIsScanning(true);
+    setScanStatus("scanning");
+    setLastScanTimestamp(new Date().toISOString());
+  }, []);
+
+  // Stop scanning
+  const stopScanning = useCallback(() => {
+    setIsScanning(false);
+    setScanStatus("idle");
+  }, []);
+
+  // Poll for latest scan
+  useEffect(() => {
+    if (!isScanning || !showForm) return;
+
+    const pollInterval = setInterval(async () => {
+      try {
+        const url = lastScanTimestamp
+          ? `/api/scan?since=${encodeURIComponent(lastScanTimestamp)}`
+          : "/api/scan";
+        const res = await fetch(url);
+        const data = await res.json();
+
+        if (res.ok && data.success && data.rfid_uuid) {
+          // Check for duplicate UUID
+          if (checkDuplicateUUID(data.rfid_uuid)) {
+            setScanStatus("error");
+            setError(`UUID ${data.rfid_uuid} already exists. Please use a different badge.`);
+            setTimeout(() => {
+              setScanStatus("idle");
+              setError(null);
+            }, 3000);
+            setIsScanning(false);
+            return;
+          }
+
+          // Update form with scanned UUID
+          setFormData((prev) => ({ ...prev, rfid_uuid: data.rfid_uuid }));
+          setScanStatus("success");
+          setLastScanTimestamp(data.timestamp);
+          setIsScanning(false);
+
+          // Reset success status after 2 seconds
+          setTimeout(() => {
+            setScanStatus("idle");
+          }, 2000);
+        }
+      } catch (e: any) {
+        console.error("Error polling for scan:", e);
+        setScanStatus("error");
+        setTimeout(() => {
+          setScanStatus("idle");
+        }, 2000);
+      }
+    }, 500); // Poll every 500ms
+
+    return () => clearInterval(pollInterval);
+  }, [isScanning, lastScanTimestamp, checkDuplicateUUID, showForm]);
+
+  // Stop scanning when form is closed
+  useEffect(() => {
+    if (!showForm && isScanning) {
+      setIsScanning(false);
+      setScanStatus("idle");
+    }
+  }, [showForm, isScanning]);
 
   async function handlePhotoUpload(file: File): Promise<string> {
     const uploadFormData = new FormData();
@@ -418,15 +503,64 @@ export default function PersonManagement() {
                 <label className="block text-sm font-medium text-gray-700 mb-1">
                   RFID UUID *
                 </label>
-                <input
-                  type="text"
-                  value={formData.rfid_uuid}
-                  onChange={(e) =>
-                    setFormData({ ...formData, rfid_uuid: e.target.value })
-                  }
-                  required
-                  className={inputClasses}
-                />
+                <div className="flex gap-2">
+                  <input
+                    type="text"
+                    value={formData.rfid_uuid}
+                    onChange={(e) => {
+                      setFormData({ ...formData, rfid_uuid: e.target.value });
+                      setScanStatus("idle");
+                    }}
+                    required
+                    className={`${inputClasses} flex-1`}
+                    placeholder={isScanning ? "Scanning... Please scan the badge" : "Enter UUID or scan badge"}
+                    disabled={isScanning}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (isScanning) {
+                        stopScanning();
+                      } else {
+                        startScanning();
+                      }
+                    }}
+                    className={`px-4 py-2 rounded-lg font-medium transition-colors flex items-center gap-2 ${
+                      isScanning
+                        ? "bg-red-500 hover:bg-red-600 text-white"
+                        : scanStatus === "success"
+                        ? "bg-green-500 text-white"
+                        : scanStatus === "error"
+                        ? "bg-red-500 text-white"
+                        : "bg-indigo-500 hover:bg-indigo-600 text-white"
+                    }`}
+                    title={isScanning ? "Stop scanning" : "Start scanning badge"}
+                  >
+                    <Scan size={18} className={isScanning ? "animate-pulse" : ""} />
+                    {isScanning ? "Stop" : "Scan"}
+                  </button>
+                </div>
+                {isScanning && (
+                  <p className="text-xs text-indigo-600 mt-1 flex items-center gap-1">
+                    <span className="animate-pulse">●</span>
+                    Listening for badge scan...
+                  </p>
+                )}
+                {scanStatus === "success" && !isScanning && (
+                  <p className="text-xs text-green-600 mt-1">
+                    ✓ Badge scanned successfully!
+                  </p>
+                )}
+                {scanStatus === "error" && !isScanning && (
+                  <p className="text-xs text-red-600 mt-1">
+                    ✗ Scan failed or duplicate UUID detected
+                  </p>
+                )}
+                {formData.rfid_uuid && checkDuplicateUUID(formData.rfid_uuid) && (
+                  <p className="text-xs text-red-600 mt-1">
+                    ⚠ This UUID already exists in the system
+                  </p>
+                )}
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">

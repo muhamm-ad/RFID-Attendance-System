@@ -17,6 +17,7 @@ A comprehensive attendance management and access control system based on RFID te
 - **Person Types**: Students, teachers, administrative staff, visitors
 - **Photos**: Photo association for each person
 - **Search**: Quick search by name, first name, or RFID UUID
+- **RFID Badge Scanning**: Scan badges directly when adding new persons
 
 ### Payment Management
 
@@ -144,7 +145,8 @@ The application exposes a complete REST API. Detailed documentation is available
 
 ### Main Endpoints
 
-- `POST /api/scan` - Scan an RFID badge
+- `POST /api/scan` - Scan an RFID badge (attendance or registration mode)
+- `GET /api/scan` - Retrieve latest registration scan UUID
 - `GET /api/persons` - List all persons
 - `POST /api/persons` - Create a new person
 - `GET /api/persons/[id]` - Get a specific person
@@ -177,9 +179,13 @@ curl -X POST http://localhost:3000/api/scan \
 Access the "Persons" tab in the dashboard to:
 
 - Add new persons
+- Scan RFID badges when adding persons (click the "Scan" button next to the UUID field)
 - Modify existing information
 - Delete persons
 - Search the list
+
+**Scanning Badges for Registration:**
+When adding a new person, click the "Scan" button next to the RFID UUID field. The system will listen for badge scans. When a badge is scanned, the UUID will be automatically populated in the form. The scanner hardware should send POST requests to `/api/scan` with only the `rfid_uuid` field (no `action` parameter) for registration mode.
 
 ### Manage Payments
 

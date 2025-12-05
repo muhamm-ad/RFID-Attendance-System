@@ -12,27 +12,52 @@
 
 ### `POST /api/scan`
 
-Scans an RFID badge and verifies access based on person type and payment status.
+Scans an RFID badge and verifies access based on person type and payment status, or returns UUID for registration.
 
 **Description:**
 
+**Attendance Mode** (when `action` is provided):
 - Checks if the badge exists in the database
 - Retrieves the associated person's information
 - For students, verifies payment for the current trimester
 - Records the access attempt in the log (Attendance)
 - Teachers, staff, and visitors always have access
 
+**Registration Mode** (when `action` is omitted or `null`):
+- Returns only the UUID without checking person or logging attendance
+- Used for scanning badges when adding new persons to the system
+- The UUID is stored temporarily and can be retrieved via GET `/api/scan`
+
 **Body Parameters:**
 
 - `rfid_uuid` (string, required): RFID badge UUID
-- `action` (string, optional): Action to record (`"in"` or `"out"`). Default: `"in"`
+- `action` (string, optional): Action to record (`"in"` or `"out"`). 
+  - If provided: Attendance mode (checks person, verifies access, logs attendance)
+  - If omitted or `null`: Registration mode (returns UUID only, no logging)
 
-**Request Example:**
+**Request Example - Attendance Mode:**
 
 ```json
 {
   "rfid_uuid": "A1B2C3D4",
   "action": "in"
+}
+```
+
+**Request Example - Registration Mode:**
+
+```json
+{
+  "rfid_uuid": "A1B2C3D4"
+}
+```
+
+or
+
+```json
+{
+  "rfid_uuid": "A1B2C3D4",
+  "action": null
 }
 ```
 
@@ -116,11 +141,74 @@ Scans an RFID badge and verifies access based on person type and payment status.
 }
 ```
 
+**Response Success (200) - Registration Mode:**
+
+When `action` is omitted or `null`, the endpoint returns only the UUID without checking person or logging attendance:
+
+```json
+{
+  "success": true,
+  "rfid_uuid": "A1B2C3D4",
+  "timestamp": "2025-11-15T10:30:00.000Z"
+}
+```
+
 **Response Error (500):**
 
 ```json
 {
   "error": "Server error during scan"
+}
+```
+
+---
+
+### `GET /api/scan`
+
+Retrieves the latest registration scan UUID.
+
+**Description:**
+
+- Returns the most recent UUID scanned in registration mode (without `action` parameter)
+- Used by the frontend to poll for new badge scans during user registration
+- Supports a `since` parameter to only return scans newer than a specific timestamp
+
+**Query Parameters:**
+
+- `since` (string, optional): ISO timestamp. Only returns scan if it's newer than this timestamp.
+
+**Request Example:**
+
+```bash
+GET /api/scan
+GET /api/scan?since=2025-11-15T10:30:00.000Z
+```
+
+**Response Success (200) - Scan Available:**
+
+```json
+{
+  "success": true,
+  "rfid_uuid": "A1B2C3D4",
+  "timestamp": "2025-11-15T10:30:00.000Z"
+}
+```
+
+**Response Success (200) - No Scan Available:**
+
+```json
+{
+  "success": true,
+  "rfid_uuid": null,
+  "timestamp": null
+}
+```
+
+**Response Error (500):**
+
+```json
+{
+  "error": "Server error retrieving latest scan"
 }
 ```
 
