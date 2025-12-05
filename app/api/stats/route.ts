@@ -1,6 +1,7 @@
 // app/api/stats/route.ts
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
+import { Prisma } from "@prisma/client";
 
 const DAY_IN_MS = 24 * 60 * 60 * 1000;
 
@@ -59,12 +60,14 @@ export async function GET(request: NextRequest) {
       },
     });
 
+    type AttendanceRecord = Prisma.AttendanceGetPayload<{}>;
+    
     const rangeAttendance = {
       total: rangeAttendanceRecords.length,
-      success: rangeAttendanceRecords.filter((r) => r.status === "success").length,
-      failed: rangeAttendanceRecords.filter((r) => r.status === "failed").length,
-      entries: rangeAttendanceRecords.filter((r) => r.action === "in").length,
-      exits: rangeAttendanceRecords.filter((r) => r.action === "out").length,
+      success: rangeAttendanceRecords.filter((r: AttendanceRecord) => r.status === "success").length,
+      failed: rangeAttendanceRecords.filter((r: AttendanceRecord) => r.status === "failed").length,
+      entries: rangeAttendanceRecords.filter((r: AttendanceRecord) => r.action === "in").length,
+      exits: rangeAttendanceRecords.filter((r: AttendanceRecord) => r.action === "out").length,
     };
 
     // 3. Attendance statistics by person type
@@ -84,8 +87,18 @@ export async function GET(request: NextRequest) {
       },
     });
 
+    type AttendanceWithPersonType = Prisma.AttendanceGetPayload<{
+      include: {
+        person: {
+          select: {
+            type: true;
+          };
+        };
+      };
+    }>;
+    
     const typeMap = new Map<string, { count: number; success: number; failed: number }>();
-    attendanceByTypeData.forEach((record) => {
+    attendanceByTypeData.forEach((record: AttendanceWithPersonType) => {
       const type = record.person.type;
       if (!typeMap.has(type)) {
         typeMap.set(type, { count: 0, success: 0, failed: 0 });
@@ -114,7 +127,13 @@ export async function GET(request: NextRequest) {
         student_id: true,
       },
     });
-    const uniqueStudentIds = new Set(studentsPaid.map((sp) => sp.student_id));
+    type StudentPaymentWithId = Prisma.StudentPaymentGetPayload<{
+      select: {
+        student_id: true;
+      };
+    }>;
+    
+    const uniqueStudentIds = new Set(studentsPaid.map((sp: StudentPaymentWithId) => sp.student_id));
     const studentsPaidCount = uniqueStudentIds.size;
 
     const paymentStats = {
@@ -154,8 +173,15 @@ export async function GET(request: NextRequest) {
       take: 10,
     });
 
+    type GroupByResult = {
+      person_id: number;
+      _count: {
+        id: number;
+      };
+    };
+    
     const topAttendance = (await Promise.all(
-      topAttendanceData.map(async (item) => {
+      topAttendanceData.map(async (item: GroupByResult) => {
         const person = await prisma.person.findUnique({
           where: { id: item.person_id },
         });
@@ -187,7 +213,19 @@ export async function GET(request: NextRequest) {
       take: 20,
     });
 
-    const recentActivity = recentActivityData.map((record) => ({
+    type RecentActivityRecord = Prisma.AttendanceGetPayload<{
+      include: {
+        person: {
+          select: {
+            nom: true;
+            prenom: true;
+            type: true;
+          };
+        };
+      };
+    }>;
+    
+    const recentActivity = recentActivityData.map((record: RecentActivityRecord) => ({
       id: record.id,
       action: record.action,
       status: record.status,
@@ -215,7 +253,7 @@ export async function GET(request: NextRequest) {
       exits: number;
     }>();
 
-    trendRecords.forEach((record) => {
+    trendRecords.forEach((record: AttendanceRecord) => {
       const dateKey = record.attendance_date.toISOString().split("T")[0];
       if (!trendMap.has(dateKey)) {
         trendMap.set(dateKey, {

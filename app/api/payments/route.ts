@@ -1,6 +1,7 @@
 // app/api/payments/route.ts
 import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/db";
+import { Prisma } from "@prisma/client";
 
 // POST: Register a payment for a student
 export async function POST(request: NextRequest) {
@@ -123,7 +124,13 @@ export async function GET(request: NextRequest) {
       },
     });
 
-    const formattedPayments = payments.map((sp) => ({
+    type StudentPaymentWithPayment = Prisma.StudentPaymentGetPayload<{
+      include: {
+        payment: true;
+      };
+    }>;
+    
+    const formattedPayments = payments.map((sp: StudentPaymentWithPayment) => ({
       id: sp.id,
       student_id: sp.student_id,
       trimester: sp.trimester,

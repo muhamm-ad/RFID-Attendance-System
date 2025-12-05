@@ -287,7 +287,7 @@ export default function PersonManagement() {
       type: person.type,
       nom: person.nom,
       prenom: person.prenom,
-      photo_path: person.photo_path,
+      photo_path: person.photo_path || "",
       level: (person.level || "") as
         | ""
         | "License_1"

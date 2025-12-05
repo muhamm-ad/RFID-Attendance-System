@@ -2,6 +2,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma, PersonWithPayments } from "@/lib/db";
 import { getPersonWithPayments } from "@/lib/utils";
+import { Person as PrismaPerson } from "@prisma/client";
 
 export async function GET(request: NextRequest) {
   try {
@@ -48,7 +49,7 @@ export async function GET(request: NextRequest) {
 
     // For students, add payment info
     const personsWithPayments = await Promise.all(
-      results.map(async (person) => {
+      results.map(async (person: PrismaPerson) => {
         if (person.type === "student") {
           const personWithPayments = await getPersonWithPayments(person.rfid_uuid);
           return personWithPayments || person;

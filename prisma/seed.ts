@@ -1,15 +1,8 @@
-import { PrismaClient } from "@/prisma/generated/client";
-import { PrismaPg } from "@prisma/adapter-pg";
-import { Pool } from "pg";
-import { fileURLToPath } from "url";
 import "dotenv/config";
+// import { PrismaClient } from "@/prisma/generated/client";
+import { PrismaClient } from "@prisma/client";
 
-const pool = new Pool({ connectionString: process.env.DATABASE_URL! });
-const adapter = new PrismaPg(pool);
-
-const prisma = new PrismaClient({
-  adapter,
-});
+const prisma = new PrismaClient();
 
 type PersonType = "student" | "teacher" | "staff" | "visitor";
 
@@ -1104,9 +1097,7 @@ export async function seedDatabase() {
   const personsCount = await prisma.person.count();
 
   if (personsCount > 0) {
-    console.log(
-      "ℹ️ Database already contains data, no action needed."
-    );
+    console.log("ℹ️ Database already contains data, no action needed.");
     return;
   }
 
@@ -1191,7 +1182,7 @@ async function main() {
 }
 
 // Only run main if this file is executed directly (not imported)
-if (fileURLToPath(import.meta.url) === process.argv[1]) {
+if (require.main === module) {
   main()
     .catch((e) => {
       console.error(e);

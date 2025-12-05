@@ -2,6 +2,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma, PersonWithPayments } from "@/lib/db";
 import { getPersonWithPayments } from "@/lib/utils";
+import { Person as PrismaPerson } from "@prisma/client";
 
 // GET: Retrieve all persons
 export async function GET(request: NextRequest) {
@@ -21,7 +22,7 @@ export async function GET(request: NextRequest) {
 
     // For students, add payment info
     const personsWithPayments = await Promise.all(
-      persons.map(async (person) => {
+      persons.map(async (person: PrismaPerson) => {
         if (person.type === "student") {
           return await getPersonWithPayments(person.rfid_uuid);
         }
