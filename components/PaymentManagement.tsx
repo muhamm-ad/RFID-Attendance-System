@@ -3,7 +3,7 @@
 
 import { useEffect, useState, useRef } from "react";
 import { CreditCard, Plus, Calendar, Search, ChevronDown, X, User } from "lucide-react";
-import Image from "next/image";
+// import Image from "next/image";
 
 type Payment = {
   id: number;
@@ -482,7 +482,7 @@ export default function PaymentManagement() {
             <div className="mb-4 p-4 bg-indigo-50 rounded-lg">
               <div className="flex items-center gap-3">
                 {selectedStudent.photo_path && selectedStudent.photo_path.trim() !== "" ? (
-                  <Image
+                  <img
                     src={selectedStudent.photo_path}
                     alt={`${selectedStudent.prenom} ${selectedStudent.nom}`}
                     className="w-12 h-12 rounded-full object-cover border-2 border-indigo-200"

@@ -120,90 +120,23 @@ npm run dev
 6. **Access the application**
 Open your browser at: [http://localhost:3000](http://localhost:3000)
 
-The application automatically redirects to the dashboard: `/dashboard`
-
-## Project Structure
-
-```text
-rfid-attendance/
-├── app/                    # Next.js application
-│   ├── api/               # REST API routes
-│   │   ├── attendance/   # Attendance management
-│   │   ├── payments/     # Payment management
-│   │   ├── persons/      # Person management
-│   │   ├── reports/      # Report generation
-│   │   ├── scan/         # RFID scan endpoint
-│   │   ├── search/       # Search
-│   │   └── stats/        # Statistics
-│   ├── dashboard/        # Main dashboard page
-│   ├── layout.tsx        # Main layout
-│   └── page.tsx          # Home page (redirect)
-├── components/            # React components
-│   ├── LogsTable.tsx     # Access logs table
-│   ├── PaymentManagement.tsx  # Payment management
-│   ├── PersonManagement.tsx   # Person management
-│   ├── Reports.tsx       # Reports
-│   ├── StatisticsDashboard.tsx # Statistics dashboard
-│   └── ThemeToggle.tsx   # Light/dark theme toggle
-├── prisma/              # Prisma schema and migrations
-│   ├── schema.prisma    # Database schema
-│   └── seed.ts          # Database seed script
-├── docs/                 # Documentation
-│   └── API.md           # Complete API documentation
-├── lib/                  # Libraries and utilities
-│   ├── db.ts            # Prisma Client configuration
-│   ├── seed.ts          # Test data (seed)
-│   ├── types.ts          # TypeScript types
-│   └── utils.ts         # Utility functions
-├── scripts/              # Utility scripts
-│   ├── test-api.sh      # API tests
-│   └── test-advanced.sh # Advanced tests
-└── public/               # Static files
-```
+The application automatically redirects to the dashboard: [`/dashboard`](./app/dashboard/page.tsx)
 
 ## Database
 
-The system uses PostgreSQL with Prisma ORM. The database schema is defined in `prisma/schema.prisma`.
+The system uses PostgreSQL with Prisma ORM. The database schema is defined in [`prisma/schema.prisma`](./prisma/schema.prisma).
 
-### Main Tables
+For Prisma documentation, visit: [https://www.prisma.io/docs](https://www.prisma.io/docs)
 
-- **Persons**: Information about persons (students, teachers, staff, visitors)
-- **Attendance**: RFID scan history (entries/exits)
-- **Payments**: Payment records
-- **student_payments**: Link between students and payments by trimester
+### Viewing the Database Model
 
-### Database Schema
+You can visualize and interact with your database using Prisma Studio:
 
-```sql
-Persons
-├── id (PRIMARY KEY)
-├── rfid_uuid (UNIQUE)
-├── type (student|teacher|staff|visitor)
-├── nom
-├── prenom
-├── photo_path (UNIQUE)
-├── created_at
-└── updated_at
-
-Attendance
-├── id (PRIMARY KEY)
-├── person_id (FOREIGN KEY → Persons)
-├── action (in|out)
-├── status (success|failed)
-└── attendance_date
-
-Payments
-├── id (PRIMARY KEY)
-├── amount
-├── payment_method (cash|card|bank_transfer)
-└── payment_date
-
-student_payments
-├── id (PRIMARY KEY)
-├── student_id (FOREIGN KEY → Persons)
-├── payment_id (FOREIGN KEY → Payments)
-└── trimester (1|2|3)
+```bash
+npx prisma studio --config ./prisma.config.mjs
 ```
+
+This will open Prisma Studio in your browser, allowing you to view and edit data directly from the database.
 
 ## REST API
 
@@ -276,11 +209,7 @@ The "Reports" tab allows you to:
 
 ## Test Data
 
-The system includes automatic test data (seed) that is loaded on first initialization:
-
-- **28 persons**: 15 students, 5 teachers, 4 staff members, 4 visitors
-- **Attendance data**: November 2024 - January 2025
-- **Payments**: Distributed across 3 trimesters
+The system includes automatic test data (seed) that is loaded on first initialization, can be found in [`prisma/seed.ts`](./prisma/seed.ts).
 
 Seed data is defined in `prisma/seed.ts` and can be loaded using `npx prisma db seed`.
 
@@ -343,7 +272,3 @@ See the [LICENSE](LICENSE) file for more details.
 ## Support
 
 For any questions or issues, please open an issue on the project repository.
-
----
-
-**Developed to facilitate attendance management in educational institutions**

@@ -1,8 +1,36 @@
-# 📋 TODO List - RFID Attendance System
+# 📋 TODO
+
+<details>
+<summary>Quick Reference</summary>
+
+**Current Issues:**
+
+- ❌ Photos stored in public folder (security risk)
+- ❌ No authentication system
+- ❌ Manual UUID entry instead of scanning
+- ⚠️ User ID uses auto-increment (should be custom format)
+- ⚠️ UI could be more polished
+- ⚠️ Mobile rendering needs refactoring
+- ⚠️ Lint errors and warnings need to be fixed
+- ⚠️ No multi-language support
+
+**Next Steps:**
+
+1. Start with photo storage security (highest priority)
+2. Implement authentication system
+3. Add badge scanning for registration
+4. Implement custom User ID format
+5. Enhance UI incrementally
+6. Add internationalization support
+
+</details>
 
 ## 🔴 URGENT - Security & Critical Features
 
 ### 1. 🔐 Enhance Photo Storage Security
+
+<details>
+<summary>Click to expand details</summary>
 
 **Priority:** URGENT  
 **Status:** Not Started  
@@ -25,9 +53,14 @@
 - `prisma/schema.prisma` (if storing in DB)
 - Create new `app/api/photos/[id]/route.ts` for secure photo serving
 
+</details>
+
 ---
 
 ### 2. 🔒 Add Authentication & Access Control
+
+<details>
+<summary>Click to expand details</summary>
 
 **Priority:** URGENT  
 **Status:** Not Started  
@@ -54,9 +87,14 @@
 - Update all API routes to check authentication
 - `lib/auth.ts` (authentication utilities)
 
+</details>
+
 ---
 
 ### 3. 📱 RFID Badge Scanning for User Registration
+
+<details>
+<summary>Click to expand details</summary>
 
 **Priority:** URGENT  
 **Status:** Not Started  
@@ -79,11 +117,16 @@
 - `app/api/scan/route.ts` (or create new endpoint for registration scanning)
 - Add scanner component or integrate existing scan API
 
+</details>
+
 ---
 
 ## 🟡 HIGH PRIORITY - Data Management & Validation
 
 ### 4. 🆔 Custom User ID Format Implementation
+
+<details>
+<summary>Click to expand details</summary>
 
 **Priority:** HIGH  
 **Status:** Not Started  
@@ -134,11 +177,53 @@
 - Ensure random number generation doesn't create collisions
 - May need to update database indexes
 
+</details>
+
+---
+
+## 🟡 HIGH PRIORITY - Code Quality
+
+### 5. 🔧 Fix Lint Errors and Warnings
+
+<details>
+<summary>Click to expand details</summary>
+
+**Priority:** HIGH  
+**Status:** Not Started  
+**Description:** Fix all linting errors, warnings, and code quality issues throughout the codebase to ensure clean, maintainable code.
+
+**Tasks:**
+
+- [ ] Run linter on entire codebase to identify all errors and warnings
+- [ ] Fix TypeScript type errors and warnings
+- [ ] Fix ESLint errors and warnings
+- [ ] Fix unused imports and variables
+- [ ] Fix missing dependencies in useEffect hooks
+- [ ] Fix accessibility warnings (if any)
+- [ ] Fix console errors and warnings
+- [ ] Ensure consistent code formatting across all files
+- [ ] Add missing type definitions
+- [ ] Fix any deprecated API usage
+- [ ] Resolve any build-time warnings
+- [ ] Update ESLint/TypeScript configuration if needed
+
+**Files to modify:**
+
+- All component files in `components/`
+- All API route files in `app/api/`
+- Configuration files (`eslint.config.js`, `tsconfig.json`, etc.)
+- Any other files with linting issues
+
+</details>
+
 ---
 
 ## 🟡 HIGH PRIORITY - UI & UX Enhancements
 
-### 5. 🎨 Enhance User Interface
+### 6. 🎨 Enhance User Interface
+
+<details>
+<summary>Click to expand details</summary>
 
 **Priority:** HIGH  
 **Status:** Not Started  
@@ -147,6 +232,7 @@
 **Tasks:**
 
 - [ ] Improve responsive design for mobile devices
+- [ ] Refactor the mobile rendering
 - [ ] Add loading states and skeleton screens
 - [ ] Enhance form validation with better error messages
 - [ ] Add toast notifications for success/error messages
@@ -165,11 +251,16 @@
 - `app/dashboard/page.tsx`
 - `app/globals.css`
 
+</details>
+
 ---
 
 ## 🟢 MEDIUM PRIORITY - Internationalization
 
-### 6. 🌍 Add Multi-language Support
+### 7. 🌍 Add Multi-language Support
+
+<details>
+<summary>Click to expand details</summary>
 
 **Priority:** MEDIUM  
 **Status:** Not Started  
@@ -196,43 +287,80 @@
 - Update all components to use translation keys
 - `components/LanguageSwitcher.tsx`
 
+</details>
+
 ---
 
 ## 📝 Additional Improvements (Future)
 
-### 7. 📊 Enhanced Reporting
+### 8. 📊 Enhanced Reporting
+
+<details>
+<summary>Click to expand details</summary>
+
+**Tasks:**
 
 - [ ] Add export functionality (PDF, Excel, CSV)
 - [ ] Add custom date range filters
 - [ ] Add advanced analytics and insights
 - [ ] Add email reports
 
-### 8. 🔔 Notifications
+</details>
+
+### 9. 🔔 Notifications
+
+<details>
+<summary>Click to expand details</summary>
+
+**Tasks:**
 
 - [ ] Add email notifications for important events
 - [ ] Add SMS notifications (optional)
 - [ ] Add in-app notification system
 
-### 9. 🧪 Testing
+</details>
+
+### 10. 🧪 Testing
+
+<details>
+<summary>Click to expand details</summary>
+
+**Tasks:**
 
 - [ ] Add unit tests for API routes
 - [ ] Add integration tests
 - [ ] Add E2E tests with Playwright/Cypress
 - [ ] Add test coverage reporting
 
-### 10. 📱 Mobile App
+</details>
+
+### 11. 📱 Mobile App
+
+<details>
+<summary>Click to expand details</summary>
+
+**Tasks:**
 
 - [ ] Create mobile app (React Native or PWA)
 - [ ] Add offline support
 - [ ] Add push notifications
 
-### 11. 🔧 DevOps & Infrastructure
+</details>
+
+### 12. 🔧 DevOps & Infrastructure
+
+<details>
+<summary>Click to expand details</summary>
+
+**Tasks:**
 
 - [ ] Add CI/CD pipeline
 - [ ] Add Docker containerization
 - [ ] Add environment-specific configurations
 - [ ] Add monitoring and logging (Sentry, etc.)
 - [ ] Add backup and recovery procedures
+
+</details>
 
 ---
 
@@ -242,25 +370,3 @@
 - **UI enhancements** can be done incrementally
 - **Internationalization** can be added after core features are stable
 - Consider creating separate branches for each major feature
-
----
-
-## 🎯 Quick Reference
-
-**Current Issues:**
-
-- ❌ Photos stored in public folder (security risk)
-- ❌ No authentication system
-- ❌ Manual UUID entry instead of scanning
-- ⚠️ User ID uses auto-increment (should be custom format)
-- ⚠️ UI could be more polished
-- ⚠️ No multi-language support
-
-**Next Steps:**
-
-1. Start with photo storage security (highest priority)
-2. Implement authentication system
-3. Add badge scanning for registration
-4. Implement custom User ID format
-5. Enhance UI incrementally
-6. Add internationalization support

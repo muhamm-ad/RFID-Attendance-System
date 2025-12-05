@@ -13,7 +13,6 @@ import {
 import DataTable, { Column } from "./DataTable";
 import PersonSearchDropdown from "./PersonSearchDropdown";
 import PersonAvatar from "./PersonAvatar";
-// import { useClickOutside } from "@/hooks/useClickOutside";
 import {
   typeColors,
   BadgeGray,
@@ -24,7 +23,8 @@ import {
   buttonPrimaryClasses,
   buttonSecondaryClasses,
 } from "@/lib/ui-utils";
-import Image from "next/image";
+// import { useClickOutside } from "@/hooks/useClickOutside";
+// import Image from "next/image";
 
 export default function PersonManagement() {
   const [persons, setPersons] = useState<PersonWithPayments[]>([]);
@@ -524,7 +524,7 @@ export default function PersonManagement() {
                 </label>
                 {photoPreview && (
                   <div className="mb-2">
-                    <Image
+                    <img
                       src={photoPreview}
                       alt="Preview"
                       className="w-24 h-24 object-cover rounded-lg border border-gray-300"
