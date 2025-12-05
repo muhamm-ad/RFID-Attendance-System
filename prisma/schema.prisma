@@ -15,7 +15,7 @@ model Person {
   type       PersonType
   nom        String
   prenom     String
-  photo_path String        @unique
+  photo_path String?       @unique
   level      StudentLevel?
   class      String?
   created_at DateTime      @default(now())

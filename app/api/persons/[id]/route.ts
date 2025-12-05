@@ -111,7 +111,7 @@ export async function PUT(
     if (type !== undefined) updateData.type = type;
     if (nom !== undefined) updateData.nom = nom;
     if (prenom !== undefined) updateData.prenom = prenom;
-    if (photo_path !== undefined) updateData.photo_path = photo_path;
+    if (photo_path !== undefined) updateData.photo_path = photo_path && photo_path.trim() !== "" ? photo_path : null;
     if (level !== undefined) updateData.level = level;
     if (classField !== undefined) updateData.class = classField;
 

@@ -240,11 +240,6 @@ export default function PersonManagement() {
         photoPath = await handlePhotoUpload(selectedPhoto);
       }
 
-      // If no photo is provided and it's a new person, show error
-      if (!photoPath && !editingPerson) {
-        throw new Error("Please select a photo");
-      }
-
       const url = editingPerson
         ? `/api/persons/${editingPerson.id}`
         : "/api/persons";
@@ -255,7 +250,7 @@ export default function PersonManagement() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           ...formData,
-          photo_path: photoPath || formData.photo_path,
+          photo_path: photoPath || formData.photo_path || null,
           level: formData.type === "student" ? formData.level || null : null,
           class: formData.class || null,
         }),
@@ -415,6 +410,11 @@ export default function PersonManagement() {
               </button>
             </div>
             <form onSubmit={handleSubmit} className="space-y-4">
+              {error && (
+                <div className="mb-4 rounded-lg bg-red-50 border border-red-200 p-4">
+                  <p className="text-sm text-red-700">{error}</p>
+                </div>
+              )}
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
                   RFID UUID *
@@ -521,7 +521,7 @@ export default function PersonManagement() {
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Photo {!editingPerson ? "*" : ""}
+                  Photo
                 </label>
                 {photoPreview && (
                   <div className="mb-2">
@@ -536,11 +536,10 @@ export default function PersonManagement() {
                   type="file"
                   accept="image/jpeg,image/jpg,image/png,image/webp"
                   onChange={handlePhotoChange}
-                  required={!editingPerson}
                   className={inputClasses}
                 />
                 <p className="text-xs text-gray-500 mt-1">
-                  Formats acceptés: JPEG, PNG, WebP (max 5MB)
+                  Formats acceptés: JPEG, PNG, WebP (max 5MB) - Optionnel
                 </p>
               </div>
               <div className="flex gap-3 pt-4">

@@ -63,11 +63,11 @@ export async function POST(request: NextRequest) {
     } = body;
 
     // Validate required fields
-    if (!rfid_uuid || !type || !nom || !prenom || !photo_path) {
+    if (!rfid_uuid || !type || !nom || !prenom) {
       return NextResponse.json(
         {
           error:
-            "Missing required fields (rfid_uuid, type, nom, prenom, photo_path)",
+            "Missing required fields (rfid_uuid, type, nom, prenom)",
         },
         { status: 400 }
       );
@@ -114,7 +114,7 @@ export async function POST(request: NextRequest) {
         type: type as any,
         nom,
         prenom,
-        photo_path,
+        photo_path: photo_path && photo_path.trim() !== "" ? photo_path : null,
         level: level || null,
         class: classField || null,
       },

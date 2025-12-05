@@ -332,6 +332,11 @@ export default function PaymentManagement() {
           <div className="bg-white rounded-xl shadow-xl p-6 w-full max-w-md">
             <h3 className="text-xl font-bold text-gray-800 mb-4">Record New Payment</h3>
             <form onSubmit={handleSubmit} className="space-y-4">
+              {error && (
+                <div className="mb-4 rounded-lg bg-red-50 border border-red-200 p-4">
+                  <p className="text-sm text-red-700">{error}</p>
+                </div>
+              )}
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
                   Student *
@@ -455,7 +460,10 @@ export default function PaymentManagement() {
                 </button>
                 <button
                   type="button"
-                  onClick={() => setShowForm(false)}
+                  onClick={() => {
+                    setShowForm(false);
+                    setError(null);
+                  }}
                   className="flex-1 px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors"
                 >
                   Cancel
