@@ -1,8 +1,10 @@
-import "dotenv/config";
-// import { PrismaClient } from "@/prisma/generated/client";
-import { PrismaClient } from "@prisma/client";
+import { PrismaClient } from "@/prisma/generated/client";
+import { PrismaPg } from "@prisma/adapter-pg";
 
-const prisma = new PrismaClient();
+const adapter = new PrismaPg({
+  connectionString: process.env.DATABASE_URL,
+});
+const prisma = new PrismaClient({ adapter });
 
 type PersonType = "student" | "teacher" | "staff" | "visitor";
 

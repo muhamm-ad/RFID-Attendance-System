@@ -3,23 +3,24 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "dev": "next dev",
-    "build": "prisma generate && next build",
-    "start": "next start",
     "lint": "eslint",
-    "postinstall": "prisma generate"
+    "postinstall": "prisma generate",
+    "start": "next start",
+    "dev": "next dev",
+    "build": "prisma generate && next build"
+  },
+  "prisma": {
+    "seed": "tsx prisma/seed.ts"
   },
   "dependencies": {
     "@prisma/adapter-pg": "^7.1.0",
-    "@prisma/adapter-ppg": "^7.1.0",
-    "@prisma/client": "^7.1.0",
+    "@prisma/client": "latest",
     "@types/bcryptjs": "^2.4.6",
     "@types/uuid": "^10.0.0",
     "bcryptjs": "^3.0.3",
     "date-fns": "^4.1.0",
     "lucide-react": "^0.553.0",
     "next": "^16.0.7",
-    "pg": "^8.16.3",
     "react": "19.2.0",
     "react-dom": "19.2.0",
     "uuid": "^13.0.0"
@@ -32,10 +33,9 @@
     "@types/react-dom": "^19",
     "babel-plugin-react-compiler": "1.0.0",
     "dotenv": "^17.2.3",
-    "dotenv-cli": "^11.0.0",
     "eslint": "^9",
     "eslint-config-next": "16.0.3",
-    "prisma": "^7.1.0",
+    "prisma": "latest",
     "tailwindcss": "^4",
     "tsx": "^4.21.0",
     "typescript": "^5.9.3"

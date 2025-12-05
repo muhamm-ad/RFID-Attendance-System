@@ -20,7 +20,7 @@ CREATE TABLE "persons" (
     "type" "PersonType" NOT NULL,
     "nom" TEXT NOT NULL,
     "prenom" TEXT NOT NULL,
-    "photo_path" TEXT NOT NULL,
+    "photo_path" TEXT,
     "level" "StudentLevel",
     "class" TEXT,
     "created_at" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
