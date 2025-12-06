@@ -238,6 +238,7 @@ ApiResponse sendScanToAPI(String rfidUUID, String action) {
   String url = String(API_BASE_URL) + String(API_SCAN_ENDPOINT);
   
   http.begin(url);
+  http.setTimeout(5000);  // 5 second timeout to prevent blocking
   http.addHeader("Content-Type", "application/json");
   
   // Create JSON payload
@@ -324,7 +325,14 @@ void handleReader(MFRC522& r,
   unsigned long nowMs = millis();
   if (showState != IDLE) return;
 
-  if (r.PICC_IsNewCardPresent() && r.PICC_ReadCardSerial()) {
+  // Try to detect card
+  if (!r.PICC_IsNewCardPresent()) {
+    return;  // No card present, exit early
+  }
+
+  DEBUG_PRINTF("[DEBUG] %s: Card detected, reading...\n", label);
+
+  if (r.PICC_ReadCardSerial()) {
     if (r.uid.size >= 1 && r.uid.size <= 10) {
       int uidSize = r.uid.size;
       byte uid[10]; 
@@ -398,8 +406,32 @@ void setup() {
 
   // SPI + RC522
   SPI.begin(SPI_SCK, SPI_MISO, SPI_MOSI);
+  delay(100);  // Give SPI time to stabilize after WiFi
+  
+  // Initialize RFID readers - IN first
+  DEBUG_PRINTLN("[INIT] Initializing rfidIn...");
   rfidIn.PCD_Init(IN_SS, IN_RST);
+  delay(50);  // Small delay between initializations
+  
+  // Verify rfidIn is working
+  byte versionIn = rfidIn.PCD_ReadRegister(rfidIn.VersionReg);
+  DEBUG_PRINTF("[INIT] rfidIn version: 0x%02X\n", versionIn);
+  if (versionIn == 0x00 || versionIn == 0xFF) {
+    DEBUG_PRINTLN("[WARN] rfidIn may not be properly initialized!");
+  }
+  
+  // Initialize OUT reader
+  DEBUG_PRINTLN("[INIT] Initializing rfidOut...");
   rfidOut.PCD_Init(OUT_SS, OUT_RST);
+  delay(50);
+  
+  // Verify rfidOut is working
+  byte versionOut = rfidOut.PCD_ReadRegister(rfidOut.VersionReg);
+  DEBUG_PRINTF("[INIT] rfidOut version: 0x%02X\n", versionOut);
+  if (versionOut == 0x00 || versionOut == 0xFF) {
+    DEBUG_PRINTLN("[WARN] rfidOut may not be properly initialized!");
+  }
+  
   delay(60);
 
   // Servo
@@ -428,7 +460,13 @@ void loop() {
   }
 
   // Lecture des deux lecteurs avec actions différentes
+  // Process "in" reader first
   handleReader(rfidIn,  lastUID_in,  lastUIDSize_in,  lastScan_in,  "ENTREE", "in");
+  
+  // Small delay to prevent SPI bus conflicts
+  delay(10);
+  
+  // Then process "out" reader
   handleReader(rfidOut, lastUID_out, lastUIDSize_out, lastScan_out, "SORTIE", "out");
 
   // Gestion servo & buzzer
