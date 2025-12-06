@@ -80,6 +80,12 @@ Install these libraries in Arduino IDE:
 1. **MFRC522** by GithubCommunity
    - Tools → Manage Libraries → Search "MFRC522"
 
+2. **ArduinoJson** by Benoit Blanchon
+   - Tools → Manage Libraries → Search "ArduinoJson"
+   - Required for parsing API responses
+
+3. **WiFi** and **HTTPClient** - Built-in ESP32 libraries (no installation needed)
+
 ### Arduino IDE Configuration
 
 Same as Door System:
@@ -87,103 +93,42 @@ Same as Door System:
 2. Select your ESP32 board
 3. Configure upload settings
 
-### Code Structure
+### Code Implementation
 
-The registration system code should:
+The complete code is available in `esp32-registration.ino`. The system:
 
-1. Initialize WiFi connection
-2. Initialize RFID reader
-3. Continuously scan for RFID cards
-4. When a card is detected:
-   - Read the UID
-   - Send POST request to `/api/scan` with only `rfid_uuid` (no `action`)
-   - Provide feedback (LED/buzzer)
-   - Wait before next scan
+1. ✅ Initializes WiFi connection
+2. ✅ Initializes RFID reader
+3. ✅ Continuously scans for RFID cards
+4. ✅ When a card is detected:
+   - Reads the UID
+   - Sends POST request to `/api/scan` with only `rfid_uuid` (no `action` parameter)
+   - Provides LED feedback
+   - Implements anti-passback to prevent duplicate scans
+   - Waits before next scan
 
-### Example Code Structure
+### Code Configuration
 
+Before uploading, configure these settings in `esp32-registration.ino`:
+
+**WiFi Credentials:**
 ```cpp
-#include <Arduino.h>
-#include <SPI.h>
-#include <MFRC522.h>
-#include <WiFi.h>
-#include <HTTPClient.h>
+const char* WIFI_SSID = "YOUR_WIFI_SSID";
+const char* WIFI_PASSWORD = "YOUR_WIFI_PASSWORD";
+```
 
-// Pin definitions
-#define SS_PIN 5
-#define RST_PIN 13
+**API Server URL:**
+```cpp
+const char* API_BASE_URL = "http://YOUR_SERVER_IP:3000";
+// or for Vercel deployment:
+const char* API_BASE_URL = "https://your-deployment.vercel.app";
+```
 
-// WiFi credentials
-const char* ssid = "YOUR_WIFI_SSID";
-const char* password = "YOUR_WIFI_PASSWORD";
-
-// Server URL
-const char* serverUrl = "http://YOUR_SERVER_IP:3000/api/scan";
-
-// RFID reader
-MFRC522 rfid(SS_PIN, RST_PIN);
-
-void setup() {
-  Serial.begin(115200);
-  
-  // Initialize WiFi
-  WiFi.begin(ssid, password);
-  while (WiFi.status() != WL_CONNECTED) {
-    delay(500);
-    Serial.print(".");
-  }
-  Serial.println("WiFi connected");
-  
-  // Initialize RFID
-  SPI.begin();
-  rfid.PCD_Init();
-  
-  Serial.println("Registration system ready");
-}
-
-void loop() {
-  // Scan for RFID cards
-  if (rfid.PICC_IsNewCardPresent() && rfid.PICC_ReadCardSerial()) {
-    // Read UID
-    String uid = "";
-    for (byte i = 0; i < rfid.uid.size; i++) {
-      if (rfid.uid.uidByte[i] < 0x10) uid += "0";
-      uid += String(rfid.uid.uidByte[i], HEX);
-    }
-    uid.toUpperCase();
-    
-    // Send to server
-    sendRegistration(uid);
-    
-    // Halt and stop
-    rfid.PICC_HaltA();
-    rfid.PCD_StopCrypto1();
-    
-    delay(1000); // Prevent multiple scans
-  }
-}
-
-void sendRegistration(String uid) {
-  HTTPClient http;
-  http.begin(serverUrl);
-  http.addHeader("Content-Type", "application/json");
-  
-  String json = "{\"rfid_uuid\":\"" + uid + "\"}";
-  
-  int httpResponseCode = http.POST(json);
-  
-  if (httpResponseCode > 0) {
-    Serial.print("HTTP Response code: ");
-    Serial.println(httpResponseCode);
-    String response = http.getString();
-    Serial.println(response);
-  } else {
-    Serial.print("Error code: ");
-    Serial.println(httpResponseCode);
-  }
-  
-  http.end();
-}
+**Pin Configuration (if different):**
+```cpp
+#define RFID_SS   5   // Chip Select pin
+#define RFID_RST  13  // Reset pin
+#define LED_PIN   2   // Optional LED feedback
 ```
 
 ## API Integration
@@ -213,23 +158,33 @@ The frontend can then retrieve this UUID using `GET /api/scan` to populate the r
 
 ## Operation Flow
 
-1. **System Ready:**
-   - ESP32 connects to WiFi
-   - RFID reader initialized
-   - System waits for badge scan
+1. **System Startup:**
+   - ESP32 connects to WiFi (LED blinks 3 times on success)
+   - RFID reader initialized and tested
+   - System ready message displayed on serial monitor
 
 2. **Badge Scan:**
-   - User presents RFID badge
-   - System reads UID
-   - Sends UUID to backend (registration mode)
-   - Provides feedback (LED blink or beep)
-   - Waits for next scan
+   - User presents RFID badge to the reader
+   - System reads UID and converts to hex string
+   - LED turns on during processing
+   - Sends POST request to `/api/scan` with UUID (registration mode)
+   - **Success:** LED blinks twice quickly
+   - **Error:** LED stays on longer
+   - Anti-passback prevents same card from being scanned within 3 seconds
 
 3. **Frontend Integration:**
    - User clicks "Scan" button in person registration form
    - Frontend polls `GET /api/scan` endpoint
    - When UUID is received, it populates the form
-   - User completes registration
+   - User completes registration with person details
+
+## Features
+
+- ✅ **WiFi Auto-Reconnect:** Automatically reconnects if WiFi is lost
+- ✅ **Anti-Passback:** Prevents duplicate scans of the same card
+- ✅ **Visual Feedback:** LED indicates scan status
+- ✅ **Serial Debugging:** Detailed serial output for troubleshooting
+- ✅ **Error Handling:** Graceful handling of network and API errors
 
 ## Configuration
 
@@ -248,11 +203,12 @@ Update the backend server address:
 const char* serverUrl = "http://YOUR_SERVER_IP:3000/api/scan";
 ```
 
-### Scan Delay
+### Scan Parameters
 
-Adjust the delay between scans to prevent multiple reads:
+Adjust these constants in the code:
 ```cpp
-delay(1000); // 1 second delay (adjust as needed)
+const unsigned long SCAN_DELAY_MS = 1500;  // Delay after each scan
+const unsigned long ANTI_PASS_MS = 3000;    // Prevent same card scan window
 ```
 
 ## Troubleshooting
@@ -302,13 +258,33 @@ delay(1000); // 1 second delay (adjust as needed)
    - Check backend receives request
    - Verify frontend can retrieve UUID
 
+## Usage
+
+1. **Upload Code:**
+   - Open `esp32-registration.ino` in Arduino IDE
+   - Configure WiFi credentials and API URL
+   - Upload to ESP32
+
+2. **Test System:**
+   - Open Serial Monitor (115200 baud)
+   - Verify WiFi connection
+   - Present an RFID badge
+   - Check serial output for scan confirmation
+
+3. **Register Badge:**
+   - Scan badge with registration system
+   - Open frontend registration form
+   - Click "Scan" button
+   - Badge UUID should appear automatically
+   - Complete person information and save
+
 ## Next Steps
 
-1. Implement the complete registration system code
-2. Add visual/audio feedback
+1. ✅ Code implementation complete
+2. ✅ Visual feedback (LED) implemented
 3. Test with backend server
 4. Integrate with frontend registration form
-5. Add error handling and retry logic
+5. Add optional buzzer for audio feedback (if needed)
 
 ## Images
 
