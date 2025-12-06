@@ -8,6 +8,19 @@
 #include <HTTPClient.h>
 #include <ArduinoJson.h>
 
+// Enable/disable Serial debug output (set to 0 for production without serial monitor)
+#define ENABLE_SERIAL_DEBUG 1
+
+#if ENABLE_SERIAL_DEBUG
+  #define DEBUG_PRINT(x) Serial.print(x)
+  #define DEBUG_PRINTLN(x) Serial.println(x)
+  #define DEBUG_PRINTF(...) Serial.printf(__VA_ARGS__)
+#else
+  #define DEBUG_PRINT(x)
+  #define DEBUG_PRINTLN(x)
+  #define DEBUG_PRINTF(...)
+#endif
+
 // ---------- WIFI CONFIG ----------
 const char* WIFI_SSID = "Your Wifi SSID";
 const char* WIFI_PASSWORD = "Your Wifi Password";
@@ -62,7 +75,7 @@ String uidToString(const byte *uid, int size) {
 // ---------- API FUNCTIONS ----------
 bool sendRegistrationToAPI(String rfidUUID) {
   if (WiFi.status() != WL_CONNECTED) {
-    Serial.println("[API] WiFi non connecté!");
+    DEBUG_PRINTLN("[API] WiFi non connecté!");
     return false;
   }
 
@@ -79,17 +92,17 @@ bool sendRegistrationToAPI(String rfidUUID) {
   String jsonPayload;
   serializeJson(doc, jsonPayload);
   
-  Serial.printf("[API] POST %s\n", url.c_str());
-  Serial.printf("[API] Payload: %s\n", jsonPayload.c_str());
+  DEBUG_PRINTF("[API] POST %s\n", url.c_str());
+  DEBUG_PRINTF("[API] Payload: %s\n", jsonPayload.c_str());
   
   int httpCode = http.POST(jsonPayload);
   
   bool success = false;
   
   if (httpCode > 0) {
-    Serial.printf("[API] Response code: %d\n", httpCode);
+    DEBUG_PRINTF("[API] Response code: %d\n", httpCode);
     String payload = http.getString();
-    Serial.printf("[API] Response: %s\n", payload.c_str());
+    DEBUG_PRINTF("[API] Response: %s\n", payload.c_str());
     
     // Parse JSON response
     StaticJsonDocument<512> responseDoc;
@@ -99,16 +112,16 @@ bool sendRegistrationToAPI(String rfidUUID) {
       success = responseDoc["success"] | false;
       if (success) {
         String uuid = responseDoc["rfid_uuid"] | "";
-        Serial.printf("[API] Badge enregistré: %s\n", uuid.c_str());
+        DEBUG_PRINTF("[API] Badge enregistré: %s\n", uuid.c_str());
       } else {
         String errorMsg = responseDoc["error"] | "Unknown error";
-        Serial.printf("[API] Erreur: %s\n", errorMsg.c_str());
+        DEBUG_PRINTF("[API] Erreur: %s\n", errorMsg.c_str());
       }
     } else {
-      Serial.printf("[API] JSON parse error: %s\n", error.c_str());
+      DEBUG_PRINTF("[API] JSON parse error: %s\n", error.c_str());
     }
   } else {
-    Serial.printf("[API] HTTP Error: %s\n", http.errorToString(httpCode).c_str());
+    DEBUG_PRINTF("[API] HTTP Error: %s\n", http.errorToString(httpCode).c_str());
   }
   
   http.end();
@@ -116,22 +129,22 @@ bool sendRegistrationToAPI(String rfidUUID) {
 }
 
 void connectWiFi() {
-  Serial.print("[WiFi] Connexion à ");
-  Serial.println(WIFI_SSID);
+  DEBUG_PRINT("[WiFi] Connexion à ");
+  DEBUG_PRINTLN(WIFI_SSID);
   
   WiFi.begin(WIFI_SSID, WIFI_PASSWORD);
   
   int attempts = 0;
   while (WiFi.status() != WL_CONNECTED && attempts < 20) {
     delay(500);
-    Serial.print(".");
+    DEBUG_PRINT(".");
     attempts++;
   }
   
   if (WiFi.status() == WL_CONNECTED) {
-    Serial.println("\n[WiFi] Connecté!");
-    Serial.print("[WiFi] IP: ");
-    Serial.println(WiFi.localIP());
+    DEBUG_PRINTLN("\n[WiFi] Connecté!");
+    DEBUG_PRINT("[WiFi] IP: ");
+    DEBUG_PRINTLN(WiFi.localIP());
     
     // Blink LED to indicate WiFi connected
     for (int i = 0; i < 3; i++) {
@@ -141,7 +154,7 @@ void connectWiFi() {
       delay(100);
     }
   } else {
-    Serial.println("\n[WiFi] Échec de connexion!");
+    DEBUG_PRINTLN("\n[WiFi] Échec de connexion!");
     // Long blink to indicate error
     for (int i = 0; i < 5; i++) {
       digitalWrite(LED_PIN, HIGH);
@@ -181,7 +194,7 @@ void handleRFIDScan() {
   
   // Anti-passback: prevent same card from being scanned multiple times quickly
   if (uidSize == lastUIDSize && uidEquals(uid, lastUID, uidSize) && (nowMs - lastScanTime) < ANTI_PASS_MS) {
-    Serial.println("[SCAN] Carte déjà scannée récemment, ignorée.");
+    DEBUG_PRINTLN("[SCAN] Carte déjà scannée récemment, ignorée.");
     rfid.PICC_HaltA();
     rfid.PCD_StopCrypto1();
     return;
@@ -196,7 +209,7 @@ void handleRFIDScan() {
   
   // Convert full UID to string
   String rfidUUID = uidToString(uid, uidSize);
-  Serial.printf("\n[SCAN] Carte détectée - UUID: %s (size: %d bytes)\n", rfidUUID.c_str(), uidSize);
+  DEBUG_PRINTF("\n[SCAN] Carte détectée - UUID: %s (size: %d bytes)\n", rfidUUID.c_str(), uidSize);
   
   // Visual feedback: blink LED
   digitalWrite(LED_PIN, HIGH);
@@ -205,7 +218,7 @@ void handleRFIDScan() {
   bool success = sendRegistrationToAPI(rfidUUID);
   
   if (success) {
-    Serial.println("[SCAN] ✅ Badge enregistré avec succès!");
+    DEBUG_PRINTLN("[SCAN] ✅ Badge enregistré avec succès!");
     // Success: 2 quick blinks
     digitalWrite(LED_PIN, LOW);
     delay(100);
@@ -213,7 +226,7 @@ void handleRFIDScan() {
     delay(100);
     digitalWrite(LED_PIN, LOW);
   } else {
-    Serial.println("[SCAN] ❌ Erreur lors de l'enregistrement");
+    DEBUG_PRINTLN("[SCAN] ❌ Erreur lors de l'enregistrement");
     // Error: long blink
     delay(500);
   }
@@ -230,12 +243,14 @@ void handleRFIDScan() {
 
 // ---------- SETUP ----------
 void setup() {
+#if ENABLE_SERIAL_DEBUG
   Serial.begin(115200);
   delay(1000);
+#endif
   
-  Serial.println("\n=================================");
-  Serial.println("  RFID Registration System");
-  Serial.println("=================================\n");
+  DEBUG_PRINTLN("\n=================================");
+  DEBUG_PRINTLN("  RFID Registration System");
+  DEBUG_PRINTLN("=================================\n");
   
   // LED setup
   pinMode(LED_PIN, OUTPUT);
@@ -251,21 +266,21 @@ void setup() {
   
   // Check if RFID reader is working
   if (!rfid.PCD_PerformSelfTest()) {
-    Serial.println("[ERREUR] Lecteur RFID non détecté!");
-    Serial.println("Vérifiez les connexions SPI.");
+    DEBUG_PRINTLN("[ERREUR] Lecteur RFID non détecté!");
+    DEBUG_PRINTLN("Vérifiez les connexions SPI.");
   } else {
-    Serial.println("[OK] Lecteur RFID initialisé.");
+    DEBUG_PRINTLN("[OK] Lecteur RFID initialisé.");
   }
   
-  Serial.println("\n[SYSTEME] Prêt à scanner des badges...");
-  Serial.println("Présentez un badge RFID pour l'enregistrer.\n");
+  DEBUG_PRINTLN("\n[SYSTEME] Prêt à scanner des badges...");
+  DEBUG_PRINTLN("Présentez un badge RFID pour l'enregistrer.\n");
 }
 
 // ---------- LOOP ----------
 void loop() {
   // Reconnect WiFi if lost
   if (WiFi.status() != WL_CONNECTED) {
-    Serial.println("[WiFi] Connexion perdue, reconnexion...");
+    DEBUG_PRINTLN("[WiFi] Connexion perdue, reconnexion...");
     connectWiFi();
   }
   

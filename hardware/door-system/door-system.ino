@@ -16,6 +16,19 @@
 #include <HTTPClient.h>
 #include <ArduinoJson.h>
 
+// Enable/disable Serial debug output (set to 0 for production without serial monitor)
+#define ENABLE_SERIAL_DEBUG 1
+
+#if ENABLE_SERIAL_DEBUG
+  #define DEBUG_PRINT(x) Serial.print(x)
+  #define DEBUG_PRINTLN(x) Serial.println(x)
+  #define DEBUG_PRINTF(...) Serial.printf(__VA_ARGS__)
+#else
+  #define DEBUG_PRINT(x)
+  #define DEBUG_PRINTLN(x)
+  #define DEBUG_PRINTF(...)
+#endif
+
 struct ApiResponse;
 
 // ---------- WIFI CONFIG ----------
@@ -216,7 +229,7 @@ ApiResponse sendScanToAPI(String rfidUUID, String action) {
   response.accessGranted = false;
   
   if (WiFi.status() != WL_CONNECTED) {
-    Serial.println("[API] WiFi non connecté!");
+    DEBUG_PRINTLN("[API] WiFi non connecté!");
     response.message = "WiFi Error";
     return response;
   }
@@ -235,15 +248,15 @@ ApiResponse sendScanToAPI(String rfidUUID, String action) {
   String jsonPayload;
   serializeJson(doc, jsonPayload);
   
-  Serial.printf("[API] POST %s\n", url.c_str());
-  Serial.printf("[API] Payload: %s\n", jsonPayload.c_str());
+  DEBUG_PRINTF("[API] POST %s\n", url.c_str());
+  DEBUG_PRINTF("[API] Payload: %s\n", jsonPayload.c_str());
   
   int httpCode = http.POST(jsonPayload);
   
   if (httpCode > 0) {
-    Serial.printf("[API] Response code: %d\n", httpCode);
+    DEBUG_PRINTF("[API] Response code: %d\n", httpCode);
     String payload = http.getString();
-    Serial.printf("[API] Response: %s\n", payload.c_str());
+    DEBUG_PRINTF("[API] Response: %s\n", payload.c_str());
     
     // Parse JSON response
     StaticJsonDocument<1024> responseDoc;
@@ -262,11 +275,11 @@ ApiResponse sendScanToAPI(String rfidUUID, String action) {
         response.personType = person["type"] | "";
       }
     } else {
-      Serial.printf("[API] JSON parse error: %s\n", error.c_str());
+      DEBUG_PRINTF("[API] JSON parse error: %s\n", error.c_str());
       response.message = "Parse Error";
     }
   } else {
-    Serial.printf("[API] HTTP Error: %s\n", http.errorToString(httpCode).c_str());
+    DEBUG_PRINTF("[API] HTTP Error: %s\n", http.errorToString(httpCode).c_str());
     response.message = "HTTP Error";
   }
   
@@ -275,8 +288,8 @@ ApiResponse sendScanToAPI(String rfidUUID, String action) {
 }
 
 void connectWiFi() {
-  Serial.print("[WiFi] Connexion à ");
-  Serial.println(WIFI_SSID);
+  DEBUG_PRINT("[WiFi] Connexion à ");
+  DEBUG_PRINTLN(WIFI_SSID);
   lcdShowConnecting();
   
   WiFi.begin(WIFI_SSID, WIFI_PASSWORD);
@@ -284,19 +297,19 @@ void connectWiFi() {
   int attempts = 0;
   while (WiFi.status() != WL_CONNECTED && attempts < 20) {
     delay(500);
-    Serial.print(".");
+    DEBUG_PRINT(".");
     attempts++;
   }
   
   if (WiFi.status() == WL_CONNECTED) {
-    Serial.println("\n[WiFi] Connecté!");
-    Serial.print("[WiFi] IP: ");
-    Serial.println(WiFi.localIP());
+    DEBUG_PRINTLN("\n[WiFi] Connecté!");
+    DEBUG_PRINT("[WiFi] IP: ");
+    DEBUG_PRINTLN(WiFi.localIP());
     lcdShowConnected();
     delay(2000);
     lcdStandby();
   } else {
-    Serial.println("\n[WiFi] Échec de connexion!");
+    DEBUG_PRINTLN("\n[WiFi] Échec de connexion!");
     lcd.clear();
     lcd.setCursor(0,0); lcd.print("WiFi ERREUR!");
     delay(3000);
@@ -323,14 +336,14 @@ void handleReader(MFRC522& r,
         lastScan = nowMs;
 
         String rfidUUID = uidToString(uid, uidSize);
-        Serial.printf("\n[SCAN] %s -> UUID: %s (size: %d bytes)\n", label, rfidUUID.c_str(), uidSize);
+        DEBUG_PRINTF("\n[SCAN] %s -> UUID: %s (size: %d bytes)\n", label, rfidUUID.c_str(), uidSize);
 
         // Send to API
         ApiResponse apiResp = sendScanToAPI(rfidUUID, action);
 
         if (apiResp.success && apiResp.accessGranted) {
           // Access granted
-          Serial.printf("[ACCES] %s -> %s AUTORISE (%s)\n", 
+          DEBUG_PRINTF("[ACCES] %s -> %s AUTORISE (%s)\n", 
                        label, 
                        apiResp.personName.c_str(),
                        apiResp.personType.c_str());
@@ -343,7 +356,7 @@ void handleReader(MFRC522& r,
           buzzerOk();
         } else {
           // Access denied
-          Serial.printf("[ACCES] %s -> REFUSE: %s\n", 
+          DEBUG_PRINTF("[ACCES] %s -> REFUSE: %s\n", 
                        label, 
                        apiResp.message.c_str());
           
@@ -366,8 +379,10 @@ void handleReader(MFRC522& r,
 
 // ---------- SETUP ----------
 void setup() {
+#if ENABLE_SERIAL_DEBUG
   Serial.begin(115200);
   delay(1000);
+#endif
 
   pinMode(LED_ROUGE, OUTPUT);
   pinMode(LED_VERTE, OUTPUT);
@@ -391,7 +406,7 @@ void setup() {
   servoLock.attach(SERVO_PIN, 500, 2500);
   servoLock.write(SERVO_POS_FERME);
 
-  Serial.println("[OK] Système prêt.");
+  DEBUG_PRINTLN("[OK] Système prêt.");
   lcdStandby();
 }
 
@@ -401,7 +416,7 @@ void loop() {
 
   // Reconnect WiFi if lost
   if (WiFi.status() != WL_CONNECTED) {
-    Serial.println("[WiFi] Connexion perdue, reconnexion...");
+    DEBUG_PRINTLN("[WiFi] Connexion perdue, reconnexion...");
     connectWiFi();
   }
 
