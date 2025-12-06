@@ -9,11 +9,11 @@
 #include <ArduinoJson.h>
 
 // ---------- WIFI CONFIG ----------
-const char* WIFI_SSID = "A&A";
-const char* WIFI_PASSWORD = "Muhawwad19";
+const char* WIFI_SSID = "Your Wifi SSID";
+const char* WIFI_PASSWORD = "Your Wifi Password";
 
 // ---------- API CONFIG ----------
-const char* API_BASE_URL = "https://rfid-attendance-system-git-master-muhamm-ads-projects.vercel.app";
+const char* API_BASE_URL = "https://rfid-attendance-system-one.vercel.app";
 const char* API_SCAN_ENDPOINT = "/api/scan";
 
 // ---------- PINS ----------
@@ -37,20 +37,21 @@ const unsigned long ANTI_PASS_MS = 3000;    // Prevent same card from being scan
 MFRC522 rfid(RFID_SS, RFID_RST);
 
 // Anti-passback
-byte lastUID[4] = {0, 0, 0, 0};
+byte lastUID[10] = {0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
+int lastUIDSize = 0;
 unsigned long lastScanTime = 0;
 
 // ---------- UTILS ----------
-bool uidEquals4(const byte *a, const byte *b) {
-  for (int i = 0; i < 4; i++) {
+bool uidEquals(const byte *a, const byte *b, int size) {
+  for (int i = 0; i < size; i++) {
     if (a[i] != b[i]) return false;
   }
   return true;
 }
 
-String uidToString(const byte *uid) {
+String uidToString(const byte *uid, int size) {
   String result = "";
-  for (int i = 0; i < 4; i++) {
+  for (int i = 0; i < size; i++) {
     if (uid[i] < 0x10) result += "0";
     result += String(uid[i], HEX);
   }
@@ -164,21 +165,22 @@ void handleRFIDScan() {
     return;
   }
   
-  // Check if we have a valid UID (at least 4 bytes)
-  if (rfid.uid.size < 4) {
+  // Check if we have a valid UID (at least 1 byte)
+  if (rfid.uid.size < 1 || rfid.uid.size > 10) {
     rfid.PICC_HaltA();
     rfid.PCD_StopCrypto1();
     return;
   }
   
-  // Extract UID
-  byte uid4[4];
-  for (int i = 0; i < 4; i++) {
-    uid4[i] = rfid.uid.uidByte[i];
+  // Extract full UID
+  int uidSize = rfid.uid.size;
+  byte uid[10];
+  for (int i = 0; i < uidSize; i++) {
+    uid[i] = rfid.uid.uidByte[i];
   }
   
   // Anti-passback: prevent same card from being scanned multiple times quickly
-  if (uidEquals4(uid4, lastUID) && (nowMs - lastScanTime) < ANTI_PASS_MS) {
+  if (uidSize == lastUIDSize && uidEquals(uid, lastUID, uidSize) && (nowMs - lastScanTime) < ANTI_PASS_MS) {
     Serial.println("[SCAN] Carte déjà scannée récemment, ignorée.");
     rfid.PICC_HaltA();
     rfid.PCD_StopCrypto1();
@@ -186,14 +188,15 @@ void handleRFIDScan() {
   }
   
   // Update last scan info
-  for (int i = 0; i < 4; i++) {
-    lastUID[i] = uid4[i];
+  for (int i = 0; i < uidSize; i++) {
+    lastUID[i] = uid[i];
   }
+  lastUIDSize = uidSize;
   lastScanTime = nowMs;
   
-  // Convert UID to string
-  String rfidUUID = uidToString(uid4);
-  Serial.printf("\n[SCAN] Carte détectée - UUID: %s\n", rfidUUID.c_str());
+  // Convert full UID to string
+  String rfidUUID = uidToString(uid, uidSize);
+  Serial.printf("\n[SCAN] Carte détectée - UUID: %s (size: %d bytes)\n", rfidUUID.c_str(), uidSize);
   
   // Visual feedback: blink LED
   digitalWrite(LED_PIN, HIGH);

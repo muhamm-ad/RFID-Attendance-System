@@ -19,11 +19,11 @@
 struct ApiResponse;
 
 // ---------- WIFI CONFIG ----------
-const char* WIFI_SSID = "A&A";
-const char* WIFI_PASSWORD = "Muhawwad19";
+const char* WIFI_SSID = "Your Wifi SSID";
+const char* WIFI_PASSWORD = "Your Wifi Password";
 
 // ---------- API CONFIG ----------
-const char* API_BASE_URL = "https://rfid-attendance-system-git-master-muhamm-ads-projects.vercel.app";
+const char* API_BASE_URL = "https://rfid-attendance-system-one.vercel.app";
 const char* API_SCAN_ENDPOINT = "/api/scan";
 
 // ---------- PINS ----------
@@ -75,8 +75,10 @@ LiquidCrystal lcd(LCD_RS, LCD_E, LCD_D4, LCD_D5, LCD_D6, LCD_D7);
 Servo servoLock;
 
 // Anti-passback
-byte lastUID_in [4] = {0,0,0,0};
-byte lastUID_out[4] = {0,0,0,0};
+byte lastUID_in [10] = {0,0,0,0,0,0,0,0,0,0};
+byte lastUID_out[10] = {0,0,0,0,0,0,0,0,0,0};
+int lastUIDSize_in  = 0;
+int lastUIDSize_out = 0;
 unsigned long lastScan_in  = 0;
 unsigned long lastScan_out = 0;
 
@@ -136,14 +138,14 @@ void buzzerHandle() {
 }
 
 // ---------- UTILS ----------
-bool uidEquals4(const byte *a, const byte *b){
-  for (int i=0;i<4;i++) if (a[i]!=b[i]) return false;
+bool uidEquals(const byte *a, const byte *b, int size){
+  for (int i=0;i<size;i++) if (a[i]!=b[i]) return false;
   return true;
 }
 
-String uidToString(const byte *uid) {
+String uidToString(const byte *uid, int size) {
   String result = "";
-  for (int i = 0; i < 4; i++) {
+  for (int i = 0; i < size; i++) {
     if (uid[i] < 0x10) result += "0";
     result += String(uid[i], HEX);
   }
@@ -303,23 +305,25 @@ void connectWiFi() {
 }
 
 void handleReader(MFRC522& r,
-                  byte lastUID[4], unsigned long& lastScan,
+                  byte lastUID[10], int& lastUIDSize, unsigned long& lastScan,
                   const char* label, const char* action)
 {
   unsigned long nowMs = millis();
   if (showState != IDLE) return;
 
   if (r.PICC_IsNewCardPresent() && r.PICC_ReadCardSerial()) {
-    if (r.uid.size >= 4) {
-      byte uid4[4]; 
-      for (int i=0;i<4;i++) uid4[i] = r.uid.uidByte[i];
+    if (r.uid.size >= 1 && r.uid.size <= 10) {
+      int uidSize = r.uid.size;
+      byte uid[10]; 
+      for (int i=0;i<uidSize;i++) uid[i] = r.uid.uidByte[i];
 
-      if ( !(uidEquals4(uid4, lastUID) && (nowMs - lastScan) < ANTI_PASS_MS) ) {
-        for (int i=0;i<4;i++) lastUID[i] = uid4[i];
+      if ( !(uidSize == lastUIDSize && uidEquals(uid, lastUID, uidSize) && (nowMs - lastScan) < ANTI_PASS_MS) ) {
+        for (int i=0;i<uidSize;i++) lastUID[i] = uid[i];
+        lastUIDSize = uidSize;
         lastScan = nowMs;
 
-        String rfidUUID = uidToString(uid4);
-        Serial.printf("\n[SCAN] %s -> UUID: %s\n", label, rfidUUID.c_str());
+        String rfidUUID = uidToString(uid, uidSize);
+        Serial.printf("\n[SCAN] %s -> UUID: %s (size: %d bytes)\n", label, rfidUUID.c_str(), uidSize);
 
         // Send to API
         ApiResponse apiResp = sendScanToAPI(rfidUUID, action);
@@ -409,8 +413,8 @@ void loop() {
   }
 
   // Lecture des deux lecteurs avec actions différentes
-  handleReader(rfidIn,  lastUID_in,  lastScan_in,  "ENTREE", "in");
-  handleReader(rfidOut, lastUID_out, lastScan_out, "SORTIE", "out");
+  handleReader(rfidIn,  lastUID_in,  lastUIDSize_in,  lastScan_in,  "ENTREE", "in");
+  handleReader(rfidOut, lastUID_out, lastUIDSize_out, lastScan_out, "SORTIE", "out");
 
   // Gestion servo & buzzer
   servoCloseIfDue();
